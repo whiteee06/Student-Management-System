@@ -189,6 +189,12 @@
 
       try {
         const { user, role } = await Auth.login(email, password);
+        if (user && !user.emailVerified && user.email) {
+          try { await user.sendEmailVerification(); } catch(e) {}
+          await firebase.auth().signOut();
+          showVerifyPrompt(email);
+          return;
+        }
         const finalRole = (role === 'student' && selectedRole !== 'student') ? selectedRole : role;
         if (selectedRole !== finalRole && role !== 'student') {
           await firebase.auth().signOut();
@@ -248,6 +254,34 @@
         btnText.style.display = 'inline';
         spinner.style.display = 'none';
       }
+    }
+
+    function showVerifyPrompt(email) {
+      const container = document.querySelector('.auth-form-container');
+      container.innerHTML = `
+        <div class="auth-card" style="text-align:center">
+          <div class="auth-logo">
+            <div class="auth-logo-icon">&#128274;</div>
+          </div>
+          <h2 class="auth-title" style="margin-top:16px">Email Not Verified</h2>
+          <p class="auth-subtitle" style="margin-bottom:24px">Please verify your email before signing in</p>
+          <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 18px;margin-bottom:24px">
+            <p style="font-size:15px;font-weight:600;color:var(--primary);word-break:break-all">${email}</p>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="resendLoginVerification('${email}')" id="resendVerifyBtn">
+            <span id="resendVerifyText">Resend Verification Email</span>
+            <span id="resendVerifySpinner" style="display:none;width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite"></span>
+          </button>
+          <div class="auth-footer" style="margin-top:16px">
+            <a href="login.html">Back to Sign In</a>
+          </div>
+        </div>
+      `;
+    }
+
+    async function resendLoginVerification(email) {
+      Toast.info('Verification', 'Sign in again to resend the verification email');
+      setTimeout(() => window.location.href = 'login.html', 1200);
     }
 
     function handleForgotPassword(e) {

@@ -235,8 +235,13 @@ const Auth = {
       email,
       name,
       role,
+      emailVerified: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+    try {
+      await result.user.sendEmailVerification();
+    } catch (e) { console.error('Verification email error:', e); }
+    await firebase.auth().signOut();
     return result.user;
   },
 
