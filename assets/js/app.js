@@ -33,7 +33,7 @@ function handleFilter() {
 
 function navigateToProfile() {
   const role = Auth.getRole();
-  window.location.href = `/dashboard/${role}/profile.html`;
+  window.location.href = (typeof BASE_URL !== 'undefined' ? BASE_URL : '') + `/dashboard/${role}/profile.html`;
 }
 
 function initDashboard(role, activePage) {

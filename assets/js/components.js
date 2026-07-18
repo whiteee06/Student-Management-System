@@ -1,95 +1,96 @@
 const Components = {
   sidebar(role, activePage = '') {
+    const base = (typeof BASE_URL !== 'undefined' ? BASE_URL : '');
     const menus = {
       admin: [
         { section: 'Main', items: [
-          { icon: '&#9632;', text: 'Dashboard', href: '/dashboard/admin/index.html', id: 'dashboard' },
+          { icon: '&#9632;', text: 'Dashboard', href: base + '/dashboard/admin/index.html', id: 'dashboard' },
           { icon: '&#128196;', text: 'Notifications', href: '#', id: 'notifications', badge: 3 }
         ]},
         { section: 'Management', items: [
-          { icon: '&#128100;', text: 'Students', href: '/dashboard/admin/students.html', id: 'students' },
-          { icon: '&#128105;', text: 'Faculty', href: '/dashboard/admin/faculty.html', id: 'faculty' },
-          { icon: '&#128106;', text: 'Parents', href: '/dashboard/admin/parents.html', id: 'parents' },
-          { icon: '&#127979;', text: 'Departments', href: '/dashboard/admin/departments.html', id: 'departments' },
-          { icon: '&#128218;', text: 'Subjects', href: '/dashboard/admin/subjects.html', id: 'subjects' }
+          { icon: '&#128100;', text: 'Students', href: base + '/dashboard/admin/students.html', id: 'students' },
+          { icon: '&#128105;', text: 'Faculty', href: base + '/dashboard/admin/faculty.html', id: 'faculty' },
+          { icon: '&#128106;', text: 'Parents', href: base + '/dashboard/admin/parents.html', id: 'parents' },
+          { icon: '&#127979;', text: 'Departments', href: base + '/dashboard/admin/departments.html', id: 'departments' },
+          { icon: '&#128218;', text: 'Subjects', href: base + '/dashboard/admin/subjects.html', id: 'subjects' }
         ]},
         { section: 'Academics', items: [
-          { icon: '&#128197;', text: 'Timetable', href: '/dashboard/admin/timetable.html', id: 'timetable' },
-          { icon: '&#9745;', text: 'Attendance', href: '/dashboard/admin/attendance.html', id: 'attendance' },
-          { icon: '&#128202;', text: 'Marks', href: '/dashboard/admin/marks.html', id: 'marks' },
-          { icon: '&#128221;', text: 'Assignments', href: '/dashboard/admin/assignments.html', id: 'assignments' },
-          { icon: '&#128218;', text: 'Study Materials', href: '/dashboard/admin/materials.html', id: 'materials' }
+          { icon: '&#128197;', text: 'Timetable', href: base + '/dashboard/admin/timetable.html', id: 'timetable' },
+          { icon: '&#9745;', text: 'Attendance', href: base + '/dashboard/admin/attendance.html', id: 'attendance' },
+          { icon: '&#128202;', text: 'Marks', href: base + '/dashboard/admin/marks.html', id: 'marks' },
+          { icon: '&#128221;', text: 'Assignments', href: base + '/dashboard/admin/assignments.html', id: 'assignments' },
+          { icon: '&#128218;', text: 'Study Materials', href: base + '/dashboard/admin/materials.html', id: 'materials' }
         ]},
         { section: 'Activities', items: [
-          { icon: '&#128196;', text: 'Notices', href: '/dashboard/admin/notices.html', id: 'notices' },
-          { icon: '&#127891;', text: 'Events', href: '/dashboard/admin/events.html', id: 'events' },
-          { icon: '&#128248;', text: 'Gallery', href: '/dashboard/admin/gallery.html', id: 'gallery' },
-          { icon: '&#128176;', text: 'Reports', href: '/dashboard/admin/reports.html', id: 'reports' }
+          { icon: '&#128196;', text: 'Notices', href: base + '/dashboard/admin/notices.html', id: 'notices' },
+          { icon: '&#127891;', text: 'Events', href: base + '/dashboard/admin/events.html', id: 'events' },
+          { icon: '&#128248;', text: 'Gallery', href: base + '/dashboard/admin/gallery.html', id: 'gallery' },
+          { icon: '&#128176;', text: 'Reports', href: base + '/dashboard/admin/reports.html', id: 'reports' }
         ]},
         { section: 'System', items: [
-          { icon: '&#9881;', text: 'Settings', href: '/dashboard/admin/settings.html', id: 'settings' },
-          { icon: '&#128196;', text: 'Logs', href: '/dashboard/admin/logs.html', id: 'logs' }
+          { icon: '&#9881;', text: 'Settings', href: base + '/dashboard/admin/settings.html', id: 'settings' },
+          { icon: '&#128196;', text: 'Logs', href: base + '/dashboard/admin/logs.html', id: 'logs' }
         ]}
       ],
       faculty: [
         { section: 'Main', items: [
-          { icon: '&#9632;', text: 'Dashboard', href: '/dashboard/faculty/index.html', id: 'dashboard' }
+          { icon: '&#9632;', text: 'Dashboard', href: base + '/dashboard/faculty/index.html', id: 'dashboard' }
         ]},
         { section: 'Teaching', items: [
-          { icon: '&#9745;', text: 'Attendance', href: '/dashboard/faculty/attendance.html', id: 'attendance' },
-          { icon: '&#128221;', text: 'Assignments', href: '/dashboard/faculty/assignments.html', id: 'assignments' },
-          { icon: '&#128218;', text: 'Study Materials', href: '/dashboard/faculty/materials.html', id: 'materials' },
-          { icon: '&#128202;', text: 'Marks Entry', href: '/dashboard/faculty/marks.html', id: 'marks' }
+          { icon: '&#9745;', text: 'Attendance', href: base + '/dashboard/faculty/attendance.html', id: 'attendance' },
+          { icon: '&#128221;', text: 'Assignments', href: base + '/dashboard/faculty/assignments.html', id: 'assignments' },
+          { icon: '&#128218;', text: 'Study Materials', href: base + '/dashboard/faculty/materials.html', id: 'materials' },
+          { icon: '&#128202;', text: 'Marks Entry', href: base + '/dashboard/faculty/marks.html', id: 'marks' }
         ]},
         { section: 'Activity', items: [
-          { icon: '&#128100;', text: 'Students', href: '/dashboard/faculty/students.html', id: 'students' },
-          { icon: '&#128196;', text: 'Notices', href: '/dashboard/faculty/notices.html', id: 'notices' },
-          { icon: '&#127891;', text: 'Events', href: '/dashboard/faculty/events.html', id: 'events' },
-          { icon: '&#128176;', text: 'Analytics', href: '/dashboard/faculty/analytics.html', id: 'analytics' }
+          { icon: '&#128100;', text: 'Students', href: base + '/dashboard/faculty/students.html', id: 'students' },
+          { icon: '&#128196;', text: 'Notices', href: base + '/dashboard/faculty/notices.html', id: 'notices' },
+          { icon: '&#127891;', text: 'Events', href: base + '/dashboard/faculty/events.html', id: 'events' },
+          { icon: '&#128176;', text: 'Analytics', href: base + '/dashboard/faculty/analytics.html', id: 'analytics' }
         ]},
         { section: 'Personal', items: [
-          { icon: '&#9998;', text: 'Leave Requests', href: '/dashboard/faculty/leave.html', id: 'leave' },
-          { icon: '&#9881;', text: 'Profile', href: '/dashboard/faculty/profile.html', id: 'profile' }
+          { icon: '&#9998;', text: 'Leave Requests', href: base + '/dashboard/faculty/leave.html', id: 'leave' },
+          { icon: '&#9881;', text: 'Profile', href: base + '/dashboard/faculty/profile.html', id: 'profile' }
         ]}
       ],
       student: [
         { section: 'Main', items: [
-          { icon: '&#9632;', text: 'Dashboard', href: '/dashboard/student/index.html', id: 'dashboard' },
-          { icon: '&#128100;', text: 'My Profile', href: '/dashboard/student/profile.html', id: 'profile' }
+          { icon: '&#9632;', text: 'Dashboard', href: base + '/dashboard/student/index.html', id: 'dashboard' },
+          { icon: '&#128100;', text: 'My Profile', href: base + '/dashboard/student/profile.html', id: 'profile' }
         ]},
         { section: 'Academics', items: [
-          { icon: '&#9745;', text: 'Attendance', href: '/dashboard/student/attendance.html', id: 'attendance' },
-          { icon: '&#128221;', text: 'Assignments', href: '/dashboard/student/assignments.html', id: 'assignments' },
-          { icon: '&#128218;', text: 'Study Materials', href: '/dashboard/student/materials.html', id: 'materials' },
-          { icon: '&#128197;', text: 'Timetable', href: '/dashboard/student/timetable.html', id: 'timetable' },
-          { icon: '&#128202;', text: 'Results', href: '/dashboard/student/results.html', id: 'results' }
+          { icon: '&#9745;', text: 'Attendance', href: base + '/dashboard/student/attendance.html', id: 'attendance' },
+          { icon: '&#128221;', text: 'Assignments', href: base + '/dashboard/student/assignments.html', id: 'assignments' },
+          { icon: '&#128218;', text: 'Study Materials', href: base + '/dashboard/student/materials.html', id: 'materials' },
+          { icon: '&#128197;', text: 'Timetable', href: base + '/dashboard/student/timetable.html', id: 'timetable' },
+          { icon: '&#128202;', text: 'Results', href: base + '/dashboard/student/results.html', id: 'results' }
         ]},
         { section: 'Activity', items: [
-          { icon: '&#128196;', text: 'Notices', href: '/dashboard/student/notices.html', id: 'notices' },
-          { icon: '&#127891;', text: 'Events', href: '/dashboard/student/events.html', id: 'events' },
-          { icon: '&#128248;', text: 'Gallery', href: '/dashboard/student/gallery.html', id: 'gallery' },
-          { icon: '&#127942;', text: 'Achievements', href: '/dashboard/student/achievements.html', id: 'achievements' }
+          { icon: '&#128196;', text: 'Notices', href: base + '/dashboard/student/notices.html', id: 'notices' },
+          { icon: '&#127891;', text: 'Events', href: base + '/dashboard/student/events.html', id: 'events' },
+          { icon: '&#128248;', text: 'Gallery', href: base + '/dashboard/student/gallery.html', id: 'gallery' },
+          { icon: '&#127942;', text: 'Achievements', href: base + '/dashboard/student/achievements.html', id: 'achievements' }
         ]},
         { section: 'Personal', items: [
-          { icon: '&#9998;', text: 'Leave Request', href: '/dashboard/student/leave.html', id: 'leave' },
-          { icon: '&#128274;', text: 'Password', href: '/dashboard/student/password.html', id: 'password' }
+          { icon: '&#9998;', text: 'Leave Request', href: base + '/dashboard/student/leave.html', id: 'leave' },
+          { icon: '&#128274;', text: 'Password', href: base + '/dashboard/student/password.html', id: 'password' }
         ]}
       ],
       parent: [
         { section: 'Main', items: [
-          { icon: '&#9632;', text: 'Dashboard', href: '/dashboard/parent/index.html', id: 'dashboard' },
-          { icon: '&#128100;', text: 'My Child', href: '/dashboard/parent/child.html', id: 'child' }
+          { icon: '&#9632;', text: 'Dashboard', href: base + '/dashboard/parent/index.html', id: 'dashboard' },
+          { icon: '&#128100;', text: 'My Child', href: base + '/dashboard/parent/child.html', id: 'child' }
         ]},
         { section: 'Activity', items: [
-          { icon: '&#9745;', text: 'Attendance', href: '/dashboard/parent/attendance.html', id: 'attendance' },
-          { icon: '&#128196;', text: 'Notices', href: '/dashboard/parent/notices.html', id: 'notices' },
-          { icon: '&#9998;', text: 'Leave Status', href: '/dashboard/parent/leave.html', id: 'leave' },
-          { icon: '&#127891;', text: 'Events', href: '/dashboard/parent/events.html', id: 'events' },
-          { icon: '&#128222;', text: 'Faculty Contact', href: '/dashboard/parent/faculty.html', id: 'faculty' }
+          { icon: '&#9745;', text: 'Attendance', href: base + '/dashboard/parent/attendance.html', id: 'attendance' },
+          { icon: '&#128196;', text: 'Notices', href: base + '/dashboard/parent/notices.html', id: 'notices' },
+          { icon: '&#9998;', text: 'Leave Status', href: base + '/dashboard/parent/leave.html', id: 'leave' },
+          { icon: '&#127891;', text: 'Events', href: base + '/dashboard/parent/events.html', id: 'events' },
+          { icon: '&#128222;', text: 'Faculty Contact', href: base + '/dashboard/parent/faculty.html', id: 'faculty' }
         ]},
         { section: 'Personal', items: [
-          { icon: '&#9881;', text: 'Profile', href: '/dashboard/parent/profile.html', id: 'profile' },
-          { icon: '&#128274;', text: 'Password', href: '/dashboard/parent/password.html', id: 'password' }
+          { icon: '&#9881;', text: 'Profile', href: base + '/dashboard/parent/profile.html', id: 'profile' },
+          { icon: '&#128274;', text: 'Password', href: base + '/dashboard/parent/password.html', id: 'password' }
         ]}
       ]
     };

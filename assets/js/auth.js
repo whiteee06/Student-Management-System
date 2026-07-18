@@ -169,7 +169,7 @@ const Auth = {
     await firebase.auth().signOut();
     this._currentUser = null;
     this._userRole = null;
-    window.location.href = '/login.html';
+    window.location.href = (typeof BASE_URL !== 'undefined' ? BASE_URL : '') + '/login.html';
   },
 
   async resetPassword(email) {
@@ -202,24 +202,26 @@ const Auth = {
   },
 
   requireAuth(expectedRole) {
+    const base = typeof BASE_URL !== 'undefined' ? BASE_URL : '';
     if (!this._currentUser) {
-      window.location.href = '/login.html';
+      window.location.href = base + '/login.html';
       return false;
     }
     if (expectedRole && this._userRole !== expectedRole) {
-      window.location.href = '/login.html';
+      window.location.href = base + '/login.html';
       return false;
     }
     return true;
   },
 
   getRedirectPath(role) {
+    const base = typeof BASE_URL !== 'undefined' ? BASE_URL : '';
     const paths = {
-      admin: '/dashboard/admin/index.html',
-      faculty: '/dashboard/faculty/index.html',
-      student: '/dashboard/student/index.html',
-      parent: '/dashboard/parent/index.html'
+      admin: base + '/dashboard/admin/index.html',
+      faculty: base + '/dashboard/faculty/index.html',
+      student: base + '/dashboard/student/index.html',
+      parent: base + '/dashboard/parent/index.html'
     };
-    return paths[role] || '/login.html';
+    return paths[role] || base + '/login.html';
   }
 };

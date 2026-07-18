@@ -1,3 +1,19 @@
+const BASE_URL = (function() {
+  const path = window.location.pathname;
+  const segments = path.split('/').filter(Boolean);
+  if (segments.length > 0 && segments[segments.length - 1].includes('.html') || segments.length > 1 && segments[segments.length - 1] === '') {
+    const potentialBase = segments[0];
+    if (potentialBase && !potentialBase.includes('.') && potentialBase !== 'dashboard' && potentialBase !== 'assets') {
+      return '/' + potentialBase;
+    }
+  }
+  const folders = ['Student-Management-System'];
+  for (const f of folders) {
+    if (path.startsWith('/' + f + '/')) return '/' + f;
+  }
+  return '';
+})();
+
 const Utils = {
   formatDate(date) {
     if (!date) return 'N/A';
