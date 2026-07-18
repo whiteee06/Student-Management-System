@@ -151,6 +151,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Site Content collection (homepage CMS)
+    match /site_content/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Settings collection
     match /settings/{settingId} {
       allow read: if isAuthenticated();

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Site Content - AI&DS SMS</title>
+  <link rel="stylesheet" href="../../assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+  <style>
+    .tabs{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;padding-bottom:0}
+    .tab-btn{padding:10px 18px;border:none;background:none;color:var(--text-secondary);font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all 0.2s}
+    .tab-btn:hover{color:var(--text-primary)}
+    .tab-btn.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+    .field-group{margin-bottom:16px}
+    .field-group label{display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px}
+    .field-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .field-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+    textarea.form-input{min-height:80px;resize:vertical}
+    .item-card{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:12px;position:relative}
+    .item-card .remove-btn{position:absolute;top:8px;right:8px;background:rgba(239,68,68,0.1);color:var(--danger);border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+    .item-card .remove-btn:hover{background:rgba(239,68,68,0.2)}
+    .add-item-btn{display:flex;align-items:center;gap:6px;padding:10px 16px;border:2px dashed var(--border);border-radius:var(--radius-md);background:none;color:var(--primary);font-size:13px;font-weight:500;cursor:pointer;width:100%;justify-content:center;transition:all 0.2s}
+    .add-item-btn:hover{border-color:var(--primary);background:rgba(37,99,235,0.04)}
+    .preview-section{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px;margin-top:20px}
+    .preview-section h4{font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text-primary)}
+    .gradient-options{display:flex;gap:8px;flex-wrap:wrap}
+    .gradient-option{width:36px;height:36px;border-radius:var(--radius-sm);border:2px solid var(--border);cursor:pointer;transition:all 0.2s}
+    .gradient-option.selected{border-color:var(--primary);box-shadow:0 0 0 2px rgba(37,99,235,0.2)}
+    .gradient-option:hover{transform:scale(1.1)}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="../../assets/firebase/config.js"></script>
+  <script src="../../assets/js/utils.js"></script>
+  <script src="../../assets/js/toast.js"></script>
+  <script src="../../assets/js/theme.js"></script>
+  <script src="../../assets/js/auth.js"></script>
+  <script src="../../assets/js/db.js"></script>
+  <script src="../../assets/js/notifications.js"></script>
+  <script src="../../assets/js/components.js"></script>
+  <script src="../../assets/js/app.js"></script>
+  <script>
+    const SITE_DEFAULTS = {
+      hero: {
+        badge: '🎓 Department of Artificial Intelligence & Data Science',
+        title: 'Welcome to AI&DS Student Management System',
+        subtitle: 'A modern, secure, and comprehensive platform for managing academic activities at AVS College of Technology, Salem.',
+        stat1Value: '180', stat1Label: 'Students',
+        stat2Value: '15', stat2Label: 'Faculty',
+        stat3Value: '25', stat3Label: 'Events',
+        stat4Value: '95', stat4Label: 'Placement Rate'
+      },
+      about: {
+        badge: '📚 About Us',
+        title: 'Department of AI & Data Science',
+        subtitle: 'Empowering students with cutting-edge knowledge in Artificial Intelligence and Data Science',
+        vision: 'To be a nationally recognized center of excellence in Artificial Intelligence and Data Science, producing innovative leaders who drive technological advancement for societal benefit.',
+        mission: 'To provide world-class education in AI and Data Science through innovative teaching, cutting-edge research, and industry collaboration, nurturing creative problem-solvers.',
+        objectives: 'To equip students with practical AI skills, foster research mindset, promote interdisciplinary learning, and build industry-ready professionals with strong ethical values.'
+      },
+      faculty: {
+        badge: '👩‍🏫 Our Team',
+        title: 'Faculty Highlights',
+        subtitle: 'Learn from experienced and dedicated educators',
+        items: [
+          { name: 'H. Shankar', designation: 'Head of Department', subject: 'Machine Learning & AI', gradient: 'primary' },
+          { name: 'Ms. S. Priya', designation: 'Assistant Professor', subject: 'Data Science & Analytics', gradient: 'accent' },
+          { name: 'Mr. R. Kumar', designation: 'Assistant Professor', subject: 'Deep Learning & NLP', gradient: 'success' },
+          { name: 'Ms. V. Meena', designation: 'Assistant Professor', subject: 'Cloud Computing & Big Data', gradient: 'purple' }
+        ]
+      },
+      stats: {
+        badge: '📊 Our Numbers',
+        title: 'Department Statistics',
+        subtitle: 'Our achievements speak for themselves',
+        items: [
+          { value: '63+', label: 'Students Enrolled', gradient: 'primary' },
+          { value: '6+', label: 'Expert Faculty', gradient: 'accent' },
+          { value: '0%', label: 'Placement Rate', gradient: 'success' },
+          { value: '50+', label: 'Research Papers', gradient: 'purple' }
+        ]
+      },
+      events: {
+        badge: '🎉 What\'s Happening',
+        title: 'Upcoming Events',
+        subtitle: 'Stay updated with our latest activities',
+        items: [
+          { date: 'August 15, 2026', title: 'National AI Symposium 2026', description: 'A two-day national symposium on recent advances in Artificial Intelligence and Machine Learning.', icon: '💻', gradient: 'primary' },
+          { date: 'September 5, 2026', title: 'Data Science Workshop', description: 'Hands-on workshop on Data Analytics using Python and TensorFlow for real-world applications.', icon: '📋', gradient: 'accent' },
+          { date: 'October 20, 2026', title: 'Campus Placement Drive', description: 'Major IT companies visiting campus for final year placement including TCS, Infosys, and Wipro.', icon: '🏆', gradient: 'success' }
+        ]
+      },
+      news: {
+        badge: '📰 Latest Updates',
+        title: 'News & Announcements',
+        subtitle: 'Stay informed with the latest happenings',
+        items: [
+          { day: '12', month: 'Jul', title: 'Hackathon Winners Announced', text: 'Our students secured first place in the State-level AI Hackathon held at Anna University.', tag: '🏆 Achievement', tagClass: 'primary' },
+          { day: '05', month: 'Jul', title: 'New AI Lab Inaugurated', text: 'State-of-the-art AI & Deep Learning laboratory with GPU clusters has been inaugurated.', tag: '🏛 Infrastructure', tagClass: 'success' },
+          { day: '28', month: 'Jun', title: 'Summer Internship Program', text: 'Applications are open for summer internship program 2026. Apply before July 20th.', tag: '📝 Announcement', tagClass: 'warning' }
+        ]
+      },
+      contact: {
+        badge: '📞 Get in Touch',
+        title: 'Contact Us',
+        subtitle: 'We\'re here to help and answer your questions',
+        address: 'AVS College of Technology\nSalem - 636106\nTamil Nadu, India',
+        phone: 'HOD: +91 9944627280\nStudent: +91 9952281794\nEmail: nithiarasu248@gmail.com',
+        online: 'Website: www.avsct.ac.in\nFacebook: /avscsalem\nLinkedIn: /avs-college'
+      }
+    };
+
+    let siteData = {};
+    let activeTab = 'hero';
+    const GRADIENTS = {
+      primary: 'linear-gradient(135deg, #2563EB, #1E40AF)',
+      accent: 'linear-gradient(135deg, #06B6D4, #0891B2)',
+      success: 'linear-gradient(135deg, #22C55E, #16A34A)',
+      purple: 'linear-gradient(135deg, #8B5CF6, #7C3AED)',
+      warning: 'linear-gradient(135deg, #F59E0B, #D97706)',
+      danger: 'linear-gradient(135deg, #EF4444, #DC2626)'
+    };
+
+    initDashboard('admin', 'site-content');
+    setTimeout(loadContent, 400);
+
+    async function loadContent() {
+      try {
+        const doc = await firebase.firestore().collection('site_content').doc('homepage').get();
+        if (doc.exists) {
+          const stored = doc.data();
+          siteData = {};
+          for (const section of Object.keys(SITE_DEFAULTS)) {
+            siteData[section] = { ...SITE_DEFAULTS[section], ...(stored[section] || {}) };
+            if (SITE_DEFAULTS[section].items && stored[section] && stored[section].items) {
+              siteData[section].items = stored[section].items;
+            }
+          }
+        } else {
+          siteData = JSON.parse(JSON.stringify(SITE_DEFAULTS));
+        }
+      } catch (e) {
+        console.error('Load error:', e);
+        siteData = JSON.parse(JSON.stringify(SITE_DEFAULTS));
+      }
+      renderPage();
+    }
+
+    function renderPage() {
+      const pc = document.getElementById('pageContent');
+      pc.innerHTML = `
+        ${Components.pageHeader('Site Content Management', 'Edit the homepage content visible to all visitors', `
+          <a href="${(typeof BASE_URL !== 'undefined' ? BASE_URL : '')}/index.html" target="_blank" class="btn btn-outline btn-sm">&#128065; Preview Site</a>
+          <button class="btn btn-primary btn-sm" onclick="saveAll()">&#128190; Save All Changes</button>
+        `)}
+        <div class="card" style="padding:20px">
+          <div class="tabs" id="tabs">
+            ${['hero','about','faculty','stats','events','news','contact'].map(s => `
+              <button class="tab-btn ${s===activeTab?'active':''}" onclick="switchTab('${s}')">${s.charAt(0).toUpperCase()+s.slice(1)}</button>
+            `).join('')}
+          </div>
+          <div id="tabContent">${renderTab(activeTab)}</div>
+        </div>
+      `;
+    }
+
+    function switchTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase() === tab));
+      document.getElementById('tabContent').innerHTML = renderTab(tab);
+    }
+
+    function renderTab(tab) {
+      const d = siteData[tab];
+      const h = (label, key, type='input', opts={}) => {
+        const val = d[key] || '';
+        if (type === 'textarea') return `<div class="field-group"><label>${label}</label><textarea class="form-input" id="s_${key}" rows="${opts.rows||3}" oninput="siteData['${tab}']['${key}']=this.value">${esc(val)}</textarea></div>`;
+        return `<div class="field-group"><label>${label}</label><input type="${type}" class="form-input" id="s_${key}" value="${esc(val)}" oninput="siteData['${tab}']['${key}']=this.value"></div>`;
+      };
+
+      if (tab === 'hero') return `
+        ${h('Badge Text', 'badge')}
+        ${h('Title', 'title')}
+        ${h('Subtitle', 'subtitle', 'textarea')}
+        <div class="field-row">
+          ${h('Stat 1 Value', 'stat1Value')}
+          ${h('Stat 1 Label', 'stat1Label')}
+        </div>
+        <div class="field-row">
+          ${h('Stat 2 Value', 'stat2Value')}
+          ${h('Stat 2 Label', 'stat2Label')}
+        </div>
+        <div class="field-row">
+          ${h('Stat 3 Value', 'stat3Value')}
+          ${h('Stat 3 Label', 'stat3Label')}
+        </div>
+        <div class="field-row">
+          ${h('Stat 4 Value', 'stat4Value')}
+          ${h('Stat 4 Label', 'stat4Label')}
+        </div>
+      `;
+
+      if (tab === 'about') return `
+        ${h('Badge Text', 'badge')}
+        ${h('Title', 'title')}
+        ${h('Subtitle', 'subtitle')}
+        <hr style="border-color:var(--border);margin:20px 0">
+        <h4 style="font-size:14px;font-weight:600;margin-bottom:12px">Vision</h4>
+        ${h('Vision Text', 'vision', 'textarea', {rows:4})}
+        <h4 style="font-size:14px;font-weight:600;margin-bottom:12px;margin-top:16px">Mission</h4>
+        ${h('Mission Text', 'mission', 'textarea', {rows:4})}
+        <h4 style="font-size:14px;font-weight:600;margin-bottom:12px;margin-top:16px">Objectives</h4>
+        ${h('Objectives Text', 'objectives', 'textarea', {rows:4})}
+      `;
+
+      if (tab === 'faculty') return `
+        ${h('Badge Text', 'badge')}
+        ${h('Title', 'title')}
+        ${h('Subtitle', 'subtitle')}
+        <hr style="border-color:var(--border);margin:20px 0">
+        <h4 style="font-size:14px;font-weight:600;margin-bottom:12px">Faculty Members</h4>
+        <div id="facultyItems">${(d.items||[]).map(renderFacultyItem).join('')}</div>
+        <button class="add-item-btn" onclick="addFacultyItem()">+ Add Faculty Member</button>
+      `;
+
+      if (tab === 'stats') return `
+        ${h('Badge Text', 'badge')}
+        ${h('Title', 'title')}
+        ${h('Subtitle', 'subtitle')}
+        <hr style="border-color:var(--border);margin:20px 0">
+        <h4 style="font-size:14px;font-weight:600;margin-bottom:12px">Statistics</h4>
+        <div id="statsItems">${(d.items||[]).map(renderStatItem).join('')}</div>
+        <button class="add-item-btn" onclick="addStatItem()">+ Add Statistic</button>
+      `;
+
+      if (tab === 'events') return `
+        ${h('Badge Text', 'badge')}
+        ${h('Title', 'title')}
+        ${h('Subtitle', 'subtitle')}
+        <hr style="border-color:var(--border);margin:20px 0">
+        <h4 style="font-size:14px;font-weight:600;margin-bottom:12px">Events</h4>
+        <div id="eventsItems">${(d.items||[]).map(renderEventItem).join('')}</div>
+        <button class="add-item-btn" onclick="addEventItem()">+ Add Event</button>
+      `;
+
+      if (tab === 'news') return `
+        ${h('Badge Text', 'badge')}
+        ${h('Title', 'title')}
+        ${h('Subtitle', 'subtitle')}
+        <hr style="border-color:var(--border);margin:20px 0">
+        <h4 style="font-size:14px;font-weight:600;margin-bottom:12px">News Items</h4>
+        <div id="newsItems">${(d.items||[]).map(renderNewsItem).join('')}</div>
+        <button class="add-item-btn" onclick="addNewsItem()">+ Add News Item</button>
+      `;
+
+      if (tab === 'contact') return `
+        ${h('Badge Text', 'badge')}
+        ${h('Title', 'title')}
+        ${h('Subtitle', 'subtitle')}
+        <hr style="border-color:var(--border);margin:20px 0">
+        <div class="field-row-3">
+          ${h('Address', 'address', 'textarea', {rows:3})}
+          ${h('Phone & Email', 'phone', 'textarea', {rows:3})}
+          ${h('Online Links', 'online', 'textarea', {rows:3})}
+        </div>
+      `;
+    }
+
+    function renderFacultyItem(item, i) {
+      return `<div class="item-card">
+        <button class="remove-btn" onclick="removeItem('faculty',${i})">&#10005;</button>
+        <div class="field-row">
+          <div class="field-group"><label>Name</label><input class="form-input" value="${esc(item.name)}" oninput="siteData.faculty.items[${i}].name=this.value"></div>
+          <div class="field-group"><label>Designation</label><input class="form-input" value="${esc(item.designation)}" oninput="siteData.faculty.items[${i}].designation=this.value"></div>
+        </div>
+        <div class="field-row">
+          <div class="field-group"><label>Subject / Specialty</label><input class="form-input" value="${esc(item.subject)}" oninput="siteData.faculty.items[${i}].subject=this.value"></div>
+          <div class="field-group"><label>Avatar Gradient</label>
+            <div class="gradient-options">${Object.keys(GRADIENTS).map(g=>`<div class="gradient-option ${item.gradient===g?'selected':''}" style="background:${GRADIENTS[g]}" onclick="setFacultyGradient(${i},'${g}')"></div>`).join('')}</div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function renderStatItem(item, i) {
+      return `<div class="item-card">
+        <button class="remove-btn" onclick="removeItem('stats',${i})">&#10005;</button>
+        <div class="field-row">
+          <div class="field-group"><label>Value</label><input class="form-input" value="${esc(item.value)}" oninput="siteData.stats.items[${i}].value=this.value"></div>
+          <div class="field-group"><label>Label</label><input class="form-input" value="${esc(item.label)}" oninput="siteData.stats.items[${i}].label=this.value"></div>
+        </div>
+        <div class="field-group"><label>Card Gradient</label>
+          <div class="gradient-options">${Object.keys(GRADIENTS).map(g=>`<div class="gradient-option ${item.gradient===g?'selected':''}" style="background:${GRADIENTS[g]}" onclick="setStatGradient(${i},'${g}')"></div>`).join('')}</div>
+        </div>
+      </div>`;
+    }
+
+    function renderEventItem(item, i) {
+      return `<div class="item-card">
+        <button class="remove-btn" onclick="removeItem('events',${i})">&#10005;</button>
+        <div class="field-row">
+          <div class="field-group"><label>Date</label><input class="form-input" value="${esc(item.date)}" oninput="siteData.events.items[${i}].date=this.value"></div>
+          <div class="field-group"><label>Title</label><input class="form-input" value="${esc(item.title)}" oninput="siteData.events.items[${i}].title=this.value"></div>
+        </div>
+        <div class="field-group"><label>Description</label><textarea class="form-input" rows="2" oninput="siteData.events.items[${i}].description=this.value">${esc(item.description)}</textarea></div>
+        <div class="field-row">
+          <div class="field-group"><label>Icon (emoji)</label><input class="form-input" value="${esc(item.icon||'')}" oninput="siteData.events.items[${i}].icon=this.value"></div>
+          <div class="field-group"><label>Card Gradient</label>
+            <div class="gradient-options">${Object.keys(GRADIENTS).map(g=>`<div class="gradient-option ${item.gradient===g?'selected':''}" style="background:${GRADIENTS[g]}" onclick="setEventGradient(${i},'${g}')"></div>`).join('')}</div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function renderNewsItem(item, i) {
+      return `<div class="item-card">
+        <button class="remove-btn" onclick="removeItem('news',${i})">&#10005;</button>
+        <div class="field-row-3">
+          <div class="field-group"><label>Day</label><input class="form-input" value="${esc(item.day)}" oninput="siteData.news.items[${i}].day=this.value"></div>
+          <div class="field-group"><label>Month</label><input class="form-input" value="${esc(item.month)}" oninput="siteData.news.items[${i}].month=this.value"></div>
+          <div class="field-group"><label>Tag Text</label><input class="form-input" value="${esc(item.tag)}" oninput="siteData.news.items[${i}].tag=this.value"></div>
+        </div>
+        <div class="field-group"><label>Title</label><input class="form-input" value="${esc(item.title)}" oninput="siteData.news.items[${i}].title=this.value"></div>
+        <div class="field-group"><label>Description</label><textarea class="form-input" rows="2" oninput="siteData.news.items[${i}].text=this.value">${esc(item.text)}</textarea></div>
+        <div class="field-group"><label>Tag Style</label>
+          <div class="gradient-options">
+            ${['primary','success','warning','danger','accent'].map(c=>`<div class="gradient-option ${item.tagClass===c?'selected':''}" style="background:${GRADIENTS[c]||GRADIENTS.primary}" onclick="setNewsTagClass(${i},'${c}')"></div>`).join('')}
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function setFacultyGradient(i, g) { siteData.faculty.items[i].gradient = g; document.getElementById('tabContent').innerHTML = renderTab('faculty'); }
+    function setStatGradient(i, g) { siteData.stats.items[i].gradient = g; document.getElementById('tabContent').innerHTML = renderTab('stats'); }
+    function setEventGradient(i, g) { siteData.events.items[i].gradient = g; document.getElementById('tabContent').innerHTML = renderTab('events'); }
+    function setNewsTagClass(i, c) { siteData.news.items[i].tagClass = c; document.getElementById('tabContent').innerHTML = renderTab('news'); }
+
+    function removeItem(section, i) {
+      siteData[section].items.splice(i, 1);
+      document.getElementById('tabContent').innerHTML = renderTab(section);
+    }
+
+    function addFacultyItem() {
+      siteData.faculty.items.push({ name: '', designation: '', subject: '', gradient: 'primary' });
+      document.getElementById('tabContent').innerHTML = renderTab('faculty');
+    }
+    function addStatItem() {
+      siteData.stats.items.push({ value: '', label: '', gradient: 'primary' });
+      document.getElementById('tabContent').innerHTML = renderTab('stats');
+    }
+    function addEventItem() {
+      siteData.events.items.push({ date: '', title: '', description: '', icon: '📅', gradient: 'primary' });
+      document.getElementById('tabContent').innerHTML = renderTab('events');
+    }
+    function addNewsItem() {
+      siteData.news.items.push({ day: '', month: '', title: '', text: '', tag: '', tagClass: 'primary' });
+      document.getElementById('tabContent').innerHTML = renderTab('news');
+    }
+
+    function esc(str) { return (str||'').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+    async function saveAll() {
+      try {
+        await firebase.firestore().collection('site_content').doc('homepage').set(siteData);
+        Toast.success('Saved', 'Homepage content updated successfully');
+      } catch (e) {
+        console.error('Save error:', e);
+        Toast.error('Error', 'Failed to save: ' + e.message);
+      }
+    }
+
+    async function resetDefaults() {
+      if (!confirm('Reset all sections to default values? This cannot be undone.')) return;
+      siteData = JSON.parse(JSON.stringify(SITE_DEFAULTS));
+      try {
+        await firebase.firestore().collection('site_content').doc('homepage').set(siteData);
+        Toast.success('Reset', 'All content reset to defaults');
+        renderPage();
+      } catch (e) {
+        Toast.error('Error', e.message);
+      }
+    }
+  </script>
+</body>
+</html>

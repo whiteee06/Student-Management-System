@@ -28,6 +28,7 @@ const Components = {
           { icon: '&#128176;', text: 'Reports', href: base + '/dashboard/admin/reports.html', id: 'reports' }
         ]},
         { section: 'System', items: [
+          { icon: '&#127912;', text: 'Site Content', href: base + '/dashboard/admin/site-content.html', id: 'site-content' },
           { icon: '&#9881;', text: 'Settings', href: base + '/dashboard/admin/settings.html', id: 'settings' },
           { icon: '&#128196;', text: 'Logs', href: base + '/dashboard/admin/logs.html', id: 'logs' }
         ]}
