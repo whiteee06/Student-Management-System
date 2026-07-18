@@ -109,13 +109,30 @@
       if (!title) { Toast.warning('Required', 'Title is required'); return; }
 
       try {
-        const data = { title, subject, description: desc, deadline, uploadedBy: currentUser?.displayName || currentUser?.email, fileName: file?.name || '' };
+        const data = { title, subject, description: desc, deadline, uploadedBy: currentUser?.displayName || currentUser?.email, fileName: '', fileUrl: '' };
 
-        if (file && typeof firebase !== 'undefined' && firebase.storage) {
-          const storageRef = firebase.storage().ref();
-          const fileRef = storageRef.child(`assignments/${Date.now()}_${file.name}`);
-          await fileRef.put(file);
-          data.fileUrl = await fileRef.getDownloadURL();
+        if (file) {
+          if (file.size > 2 * 1024 * 1024) {
+            Toast.warning('File Too Large', 'Max 2MB for inline storage. Use a link for larger files.');
+            return;
+          }
+          data.fileName = file.name;
+          try {
+            if (typeof firebase !== 'undefined' && firebase.storage) {
+              const storageRef = firebase.storage().ref();
+              const fileRef = storageRef.child(`assignments/${Date.now()}_${file.name}`);
+              await fileRef.put(file);
+              data.fileUrl = await fileRef.getDownloadURL();
+            } else { throw new Error('no storage'); }
+          } catch (storageErr) {
+            const b64 = await new Promise((res, rej) => {
+              const reader = new FileReader();
+              reader.onload = () => res(reader.result);
+              reader.onerror = rej;
+              reader.readAsDataURL(file);
+            });
+            data.fileUrl = b64;
+          }
         }
 
         await DB.add('assignments', data);

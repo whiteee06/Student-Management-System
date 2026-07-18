@@ -55,7 +55,7 @@
                     ${a.uploadedBy ? `<span> | By: ${Utils.escapeHtml(a.uploadedBy)}</span>` : ''}
                   </div>
                   <div class="flex gap-2">
-                    ${a.fileUrl ? `<a href="${a.fileUrl}" target="_blank" class="btn btn-primary btn-sm">&#128194; Download</a>` : ''}
+                    ${a.fileUrl ? `<a href="${a.fileUrl}" ${a.fileUrl.startsWith('data:') ? 'download="' + Utils.escapeHtml(a.fileName || 'file') + '"' : 'target="_blank"'} class="btn btn-primary btn-sm">&#128194; Download</a>` : ''}
                   </div>
                 </div>
               </div>

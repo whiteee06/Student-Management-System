@@ -52,7 +52,7 @@
                   <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:8px">
                     <span style="font-size:var(--font-size-xs);color:var(--text-tertiary)">${Utils.formatDate(m.createdAt)}</span>
                     <div class="flex gap-2">
-                      ${m.fileUrl ? `<a href="${m.fileUrl}" target="_blank" class="btn btn-primary btn-sm">&#128194; Download</a>` : ''}
+                      ${m.fileUrl ? `<a href="${m.fileUrl}" ${m.fileUrl.startsWith('data:') ? 'download="' + Utils.escapeHtml(m.fileName || 'file') + '"' : 'target="_blank"'} class="btn btn-primary btn-sm">&#128194; Download</a>` : ''}
                       ${m.link ? `<a href="${m.link}" target="_blank" class="btn btn-accent btn-sm">&#128279; Link</a>` : ''}
                     </div>
                   </div>

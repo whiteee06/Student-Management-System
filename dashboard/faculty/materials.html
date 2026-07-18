@@ -59,7 +59,7 @@
                   <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:8px">
                     <span style="font-size:var(--font-size-xs);color:var(--text-tertiary)">Added ${Utils.formatDate(m.createdAt)}</span>
                     <div class="flex gap-2">
-                      ${m.fileUrl ? `<a href="${m.fileUrl}" target="_blank" class="btn btn-primary btn-sm">&#128194; Download</a>` : ''}
+                      ${m.fileUrl ? `<a href="${m.fileUrl}" ${m.fileUrl.startsWith('data:') ? 'download="' + Utils.escapeHtml(m.fileName || 'file') + '"' : 'target="_blank"'} class="btn btn-primary btn-sm">&#128194; Download</a>` : ''}
                       ${m.link ? `<a href="${m.link}" target="_blank" class="btn btn-accent btn-sm">&#128279; Link</a>` : ''}
                     </div>
                   </div>
@@ -111,14 +111,31 @@
           type: document.getElementById('matType').value,
           description: document.getElementById('matDesc').value.trim(),
           link: document.getElementById('matLink').value.trim(),
-          fileName: ''
+          fileName: '',
+          fileUrl: ''
         };
         const file = document.getElementById('matFile').files[0];
-        if (file && typeof firebase !== 'undefined' && firebase.storage) {
-          const ref = firebase.storage().ref().child(`materials/${Date.now()}_${file.name}`);
-          await ref.put(file);
-          data.fileUrl = await ref.getDownloadURL();
+        if (file) {
+          if (file.size > 2 * 1024 * 1024) {
+            Toast.warning('File Too Large', 'Max 2MB for inline storage. Use a link for larger files.');
+            return;
+          }
+          const reader = new FileReader();
           data.fileName = file.name;
+          try {
+            if (typeof firebase !== 'undefined' && firebase.storage) {
+              const ref = firebase.storage().ref().child(`materials/${Date.now()}_${file.name}`);
+              await ref.put(file);
+              data.fileUrl = await ref.getDownloadURL();
+            } else { throw new Error('no storage'); }
+          } catch (storageErr) {
+            const b64 = await new Promise((res, rej) => {
+              reader.onload = () => res(reader.result);
+              reader.onerror = rej;
+              reader.readAsDataURL(file);
+            });
+            data.fileUrl = b64;
+          }
         }
         await DB.add('study_materials', data);
         Toast.success('Uploaded', 'Material uploaded');
