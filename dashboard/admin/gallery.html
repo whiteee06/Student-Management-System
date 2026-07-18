@@ -110,8 +110,13 @@
                   </div>
                   <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="galDate"></div>
                 </div>
-                <div class="form-group"><label class="form-label">Image URL</label><input type="url" class="form-input" id="galUrl" placeholder="https://... or paste image URL"></div>
-                <div class="form-group"><label class="form-label">Or Upload File</label><input type="file" class="form-input" id="galFile" accept="image/*" onchange="handleFilePreview(event)"></div>
+                <div class="form-group"><label class="form-label">Image URL</label><input type="url" class="form-input" id="galUrl" placeholder="Paste image URL (https://...)"></div>
+                <div class="form-group" style="position:relative;text-align:center;padding:16px;border:2px dashed var(--border);border-radius:var(--radius-md);cursor:pointer" onclick="document.getElementById('galFile').click()" ondragover="event.preventDefault();this.style.borderColor='var(--primary)'" ondragleave="this.style.borderColor='var(--border)'" ondrop="event.preventDefault();this.style.borderColor='var(--border)';document.getElementById('galFile').files=event.dataTransfer.files;handleFilePreview(event)">
+                  <input type="file" id="galFile" accept="image/*" style="display:none" onchange="handleFilePreview(event)">
+                  <div style="font-size:24px;margin-bottom:4px">&#128248;</div>
+                  <p style="font-size:13px;color:var(--text-secondary);margin:0">Click or drag to upload image</p>
+                  <p style="font-size:11px;color:var(--text-muted);margin-top:4px">Max 2MB for inline storage</p>
+                </div>
                 <div id="galPreview" style="display:none;margin-top:8px"><img style="max-width:100%;max-height:200px;border-radius:var(--radius-sm)" id="galPreviewImg"></div>
                 <div class="form-group"><label class="form-label">Description</label><textarea class="form-input form-textarea" id="galDesc" rows="2" placeholder="Photo description"></textarea></div>
               </form>
@@ -171,8 +176,8 @@
 
       if (fileInput.files[0] && !imageUrl) {
         const file = fileInput.files[0];
-        if (file.size > 5 * 1024 * 1024) {
-          Toast.error('File Too Large', 'Max file size is 5MB');
+        if (file.size > 2 * 1024 * 1024) {
+          Toast.error('File Too Large', 'Max file size is 2MB for inline storage. Use a URL instead for larger images.');
           return;
         }
         if (!file.type.startsWith('image/')) {
