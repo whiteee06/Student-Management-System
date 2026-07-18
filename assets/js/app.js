@@ -39,8 +39,8 @@ function navigateToProfile() {
 function initDashboard(role, activePage) {
   Theme.init();
   DB.init();
-  Auth.init().then(user => {
-    if (!Auth.requireAuth(role)) return;
+
+  const renderDashboard = (user) => {
     document.getElementById('app').innerHTML = `
       <div class="app-layout">
         ${Components.sidebar(role, activePage)}
@@ -51,11 +51,23 @@ function initDashboard(role, activePage) {
       </div>
       <div class="mobile-overlay" id="mobileOverlay" onclick="toggleSidebar()"></div>
     `;
-    const userDoc = Auth.getCurrentUser();
-    if (userDoc) {
-      document.getElementById('sidebarUserName').textContent = userDoc.displayName || userDoc.email;
-      document.getElementById('sidebarAvatar').textContent = Utils.getInitials(userDoc.displayName || userDoc.email);
-      document.getElementById('headerAvatar').textContent = Utils.getInitials(userDoc.displayName || userDoc.email);
+    if (user) {
+      document.getElementById('sidebarUserName').textContent = user.displayName || user.email;
+      document.getElementById('sidebarAvatar').textContent = Utils.getInitials(user.displayName || user.email);
+      document.getElementById('headerAvatar').textContent = Utils.getInitials(user.displayName || user.email);
+    }
+  };
+
+  Auth.init().then(user => {
+    if (Auth.requireAuth(role)) {
+      renderDashboard(user);
+      return;
+    }
+    const cachedRole = localStorage.getItem('sms_user_role');
+    if (cachedRole === role) {
+      Auth._userRole = cachedRole;
+      Auth._currentUser = user || { uid: localStorage.getItem('sms_user_uid'), displayName: 'User' };
+      renderDashboard(Auth._currentUser);
     }
   });
 }

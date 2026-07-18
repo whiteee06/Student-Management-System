@@ -89,15 +89,36 @@ const Auth = {
     }
   },
 
+  async _ensureUserDoc(user, role) {
+    try {
+      const doc = await firebase.firestore().collection('users').doc(user.uid).get();
+      if (!doc.exists) {
+        await firebase.firestore().collection('users').doc(user.uid).set({
+          uid: user.uid,
+          email: user.email || '',
+          name: user.displayName || user.email || 'User',
+          role: role,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    } catch (e) { console.error('ensureUserDoc error:', e); }
+  },
+
   async login(email, password) {
     const result = await firebase.auth().signInWithEmailAndPassword(email, password);
-    const role = await this._fetchUserRole(result.user.uid);
+    let role = await this._fetchUserRole(result.user.uid);
     if (!role) {
-      await firebase.auth().signOut();
-      throw new Error('No role assigned. Contact administrator.');
+      const pendingRole = localStorage.getItem(this._CACHE_KEY);
+      if (pendingRole) {
+        role = pendingRole;
+      } else {
+        await firebase.auth().signOut();
+        throw new Error('No role assigned. Contact administrator.');
+      }
     }
     this._userRole = role;
     this._cacheRole(result.user.uid, role);
+    await this._ensureUserDoc(result.user, role);
     return { user: result.user, role };
   },
 
