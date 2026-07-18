@@ -189,13 +189,16 @@
 
       try {
         const { user, role } = await Auth.login(email, password);
-        if (selectedRole !== role) {
+        const finalRole = (role === 'student' && selectedRole !== 'student') ? selectedRole : role;
+        if (selectedRole !== finalRole && role !== 'student') {
           await firebase.auth().signOut();
           Toast.error('Role Mismatch', `Your account is registered as ${role}. Please select the correct role.`);
           return;
         }
+        Auth._userRole = finalRole;
+        Auth._cacheRole(user.uid, finalRole);
         Toast.success('Welcome!', `Signed in as ${user.displayName || email}`);
-        setTimeout(() => window.location.href = Auth.getRedirectPath(role), 500);
+        setTimeout(() => window.location.href = Auth.getRedirectPath(finalRole), 500);
       } catch (error) {
         const messages = {
           'auth/user-not-found': 'No account found with this email',

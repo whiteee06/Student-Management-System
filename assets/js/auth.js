@@ -15,8 +15,7 @@ const Auth = {
   _getCachedRole(uid) {
     try {
       const cached = localStorage.getItem(this._CACHE_KEY);
-      const cachedUid = localStorage.getItem(this._UID_KEY);
-      if (cached && cachedUid === uid) return cached;
+      if (cached) return cached;
     } catch (e) {}
     return null;
   },
@@ -80,13 +79,14 @@ const Auth = {
   },
 
   async _fetchUserRole(uid) {
-    try {
-      const doc = await firebase.firestore().collection('users').doc(uid).get();
-      return doc.exists ? doc.data().role : null;
-    } catch (e) {
-      console.error('Error fetching user role:', e);
-      return null;
-    }
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (val) => { if (!done) { done = true; resolve(val); } };
+      setTimeout(() => { finish(null); }, 5000);
+      firebase.firestore().collection('users').doc(uid).get()
+        .then(doc => finish(doc.exists ? doc.data().role : null))
+        .catch(() => finish(null));
+    });
   },
 
   async _ensureUserDoc(user, role) {
@@ -112,13 +112,12 @@ const Auth = {
       if (pendingRole) {
         role = pendingRole;
       } else {
-        await firebase.auth().signOut();
-        throw new Error('No role assigned. Contact administrator.');
+        role = 'student';
       }
     }
     this._userRole = role;
     this._cacheRole(result.user.uid, role);
-    await this._ensureUserDoc(result.user, role);
+    this._ensureUserDoc(result.user, role).catch(() => {});
     return { user: result.user, role };
   },
 
