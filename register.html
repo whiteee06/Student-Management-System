@@ -92,7 +92,7 @@
                 </div>
               </div>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom:12px">
               <label class="form-label">Role <span class="required">*</span></label>
               <div class="input-icon-wrapper">
                 <span class="input-icon">&#128101;</span>
@@ -102,6 +102,25 @@
                   <option value="faculty">Faculty</option>
                   <option value="parent">Parent</option>
                 </select>
+              </div>
+            </div>
+            <div id="studentExtraFields" style="display:none">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+                <div class="form-group" style="margin:0"><label class="form-label" style="font-size:12px">Phone</label><input type="tel" class="form-input" id="regPhone" placeholder="10-digit phone"></div>
+                <div class="form-group" style="margin:0"><label class="form-label" style="font-size:12px">Gender</label>
+                  <select class="form-input form-select" id="regGender"><option value="">Select</option><option>Male</option><option>Female</option></select>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+                <div class="form-group" style="margin:0"><label class="form-label" style="font-size:12px">Year</label>
+                  <select class="form-input form-select" id="regYear"><option value="">Select</option><option value="1">I Year</option><option value="2">II Year</option><option value="3">III Year</option><option value="4">IV Year</option></select>
+                </div>
+                <div class="form-group" style="margin:0"><label class="form-label" style="font-size:12px">Semester</label>
+                  <select class="form-input form-select" id="regSem"><option value="">Select</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select>
+                </div>
+                <div class="form-group" style="margin:0"><label class="form-label" style="font-size:12px">Section</label>
+                  <select class="form-input form-select" id="regSection"><option value="">Select</option><option>A</option><option>B</option><option>C</option></select>
+                </div>
               </div>
             </div>
             <div id="passwordFields">
@@ -165,6 +184,7 @@
       const standardFields = document.getElementById('standardRegFields');
       const passwordFields = document.getElementById('passwordFields');
       const registerBtn = document.getElementById('registerBtn');
+      const studentExtra = document.getElementById('studentExtraFields');
 
       if (role === 'parent') {
         parentInfo.style.display = 'block';
@@ -172,12 +192,14 @@
         standardFields.style.display = 'none';
         passwordFields.style.display = 'none';
         registerBtn.style.display = 'none';
+        if (studentExtra) studentExtra.style.display = 'none';
       } else {
         parentInfo.style.display = 'none';
         parentFields.style.display = 'none';
         standardFields.style.display = 'block';
         passwordFields.style.display = 'block';
         registerBtn.style.display = 'flex';
+        if (studentExtra) studentExtra.style.display = role === 'student' ? 'block' : 'none';
       }
     }
 
@@ -227,7 +249,16 @@
         }
         const user = await Auth.register({ email, password, role, name });
         if (role === 'student') {
-          await DB.add('students', { uid: user.uid, name, email, registerNumber: regNumber, role, status: 'active' });
+          await DB.add('students', {
+            uid: user.uid, name, email, registerNumber: regNumber, role,
+            phone: document.getElementById('regPhone')?.value.trim() || '',
+            gender: document.getElementById('regGender')?.value || '',
+            year: document.getElementById('regYear')?.value || '',
+            semester: document.getElementById('regSem')?.value || '',
+            section: document.getElementById('regSection')?.value || '',
+            department: 'AI&DS',
+            status: 'active'
+          });
         } else if (role === 'faculty') {
           await DB.add('faculty', { uid: user.uid, name, email, facultyId: regNumber, role, status: 'active' });
         }
