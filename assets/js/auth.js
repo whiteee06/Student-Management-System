@@ -2,6 +2,31 @@ const Auth = {
   _currentUser: null,
   _userRole: null,
   _listeners: [],
+  _CACHE_KEY: 'sms_user_role',
+  _UID_KEY: 'sms_user_uid',
+
+  _cacheRole(uid, role) {
+    try {
+      localStorage.setItem(this._UID_KEY, uid);
+      localStorage.setItem(this._CACHE_KEY, role);
+    } catch (e) {}
+  },
+
+  _getCachedRole(uid) {
+    try {
+      const cached = localStorage.getItem(this._CACHE_KEY);
+      const cachedUid = localStorage.getItem(this._UID_KEY);
+      if (cached && cachedUid === uid) return cached;
+    } catch (e) {}
+    return null;
+  },
+
+  _clearCachedRole() {
+    try {
+      localStorage.removeItem(this._CACHE_KEY);
+      localStorage.removeItem(this._UID_KEY);
+    } catch (e) {}
+  },
 
   init() {
     return new Promise((resolve) => {
@@ -9,18 +34,46 @@ const Auth = {
         resolve(null);
         return;
       }
-      firebase.auth().onAuthStateChanged((user) => {
+
+      let resolved = false;
+      const finish = (user, role) => {
+        if (resolved) return;
+        resolved = true;
         this._currentUser = user;
+        this._userRole = role;
+        this._notifyListeners(user, role);
+        resolve(user);
+      };
+
+      setTimeout(() => {
+        if (!resolved) {
+          console.warn('Auth.init timeout - using cached role');
+          const cached = this._getCachedRole(null);
+          if (cached) {
+            finish({ uid: localStorage.getItem(this._UID_KEY) }, cached);
+          } else {
+            finish(null, null);
+          }
+        }
+      }, 8000);
+
+      firebase.auth().onAuthStateChanged((user) => {
         if (user) {
+          this._currentUser = user;
+          const cached = this._getCachedRole(user.uid);
+          if (cached) {
+            this._cacheRole(user.uid, cached);
+            finish(user, cached);
+          }
           this._fetchUserRole(user.uid).then(role => {
-            this._userRole = role;
-            this._notifyListeners(user, role);
-            resolve(user);
+            if (role) this._cacheRole(user.uid, role);
+            finish(user, role);
+          }).catch(() => {
+            if (!resolved) finish(user, cached || null);
           });
         } else {
-          this._userRole = null;
-          this._notifyListeners(null, null);
-          resolve(null);
+          this._clearCachedRole();
+          finish(null, null);
         }
       });
     });
@@ -44,6 +97,7 @@ const Auth = {
       throw new Error('No role assigned. Contact administrator.');
     }
     this._userRole = role;
+    this._cacheRole(result.user.uid, role);
     return { user: result.user, role };
   },
 
@@ -138,6 +192,7 @@ const Auth = {
     }
 
     this._userRole = role;
+    this._cacheRole(parentUser.user.uid, role);
 
     await parentUser.user.updateProfile({
       displayName: `Parent of ${studentData.name}`
@@ -169,6 +224,7 @@ const Auth = {
     await firebase.auth().signOut();
     this._currentUser = null;
     this._userRole = null;
+    this._clearCachedRole();
     window.location.href = (typeof BASE_URL !== 'undefined' ? BASE_URL : '') + '/login.html';
   },
 
