@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Attendance - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/charts.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    initDashboard('student', 'attendance');
+    setTimeout(loadAttendance, 400);
+
+    async function loadAttendance() {
+      const user = Auth.getCurrentUser();
+      if (!user) return;
+      let records = [];
+      try {
+        const students = await DB.getAll('students', [DB.where('uid', '==', user.uid)]);
+        if (students.length) {
+          records = await DB.getAll('attendance', [
+            DB.where('studentId', '==', students[0].id),
+            DB.orderBy('date', 'desc')
+          ]);
+        }
+      } catch (e) {}
+
+      const totalDays = records.length;
+      const presentDays = records.filter(r => r.status === 'present').length;
+      const absentDays = records.filter(r => r.status === 'absent').length;
+      const lateDays = records.filter(r => r.status === 'late').length;
+      const mlDays = records.filter(r => r.status === 'medical').length;
+      const odDays = records.filter(r => r.status === 'od').length;
+      const percentage = totalDays ? Math.round((presentDays / totalDays) * 100) : 0;
+
+      const monthlyData = {};
+      records.forEach(r => {
+        const month = new Date(r.date).toLocaleString('default', { month: 'short' });
+        if (!monthlyData[month]) monthlyData[month] = { present: 0, total: 0 };
+        monthlyData[month].total++;
+        if (r.status === 'present') monthlyData[month].present++;
+      });
+
+      const content = `
+        ${Components.pageHeader('My Attendance', 'Track your attendance record', '')}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#9745;', percentage + '%', 'Overall Attendance', percentage >= 75 ? 'success' : 'danger', 0)}
+          ${Components.statCard('&#10004;', presentDays, 'Present Days', 'primary', 100)}
+          ${Components.statCard('&#10006;', absentDays, 'Absent Days', 'danger', 200)}
+          ${Components.statCard('&#9888;', lateDays + mlDays + odDays, 'Late / ML / OD', 'warning', 300)}
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-2">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Monthly Attendance</h3>
+            <div style="height:260px;position:relative"><canvas id="monthlyChart"></canvas></div>
+          </div>
+          <div class="card animate-fade-in-up stagger-3">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Attendance Summary</h3>
+            <div style="height:260px;position:relative"><canvas id="pieChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="card animate-fade-in-up stagger-4">
+          <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Attendance History</h3>
+          <div class="table-container" style="border:none">
+            <table class="table">
+              <thead>
+                <tr><th>Date</th><th>Status</th><th>Day</th></tr>
+              </thead>
+              <tbody>
+                ${records.length ? records.slice(0, 30).map(r => {
+                  const d = new Date(r.date);
+                  const statusClass = r.status === 'present' ? 'badge-success' : r.status === 'absent' ? 'badge-danger' : 'badge-warning';
+                  return `<tr>
+                    <td>${Utils.formatDate(r.date)}</td>
+                    <td><span class="badge ${statusClass}">${Utils.capitalize(r.status)}</span></td>
+                    <td>${d.toLocaleDateString('en-US', { weekday: 'long' })}</td>
+                  </tr>`;
+                }).join('') : `<tr><td colspan="3">${Components.emptyState('&#9745;', 'No Records', 'No attendance records found yet.')}</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+
+      setTimeout(() => {
+        const months = Object.keys(monthlyData);
+        const monthPerc = months.map(m => Math.round((monthlyData[m].present / monthlyData[m].total) * 100));
+        Charts.monthlyAttendanceChart('monthlyChart', months, monthPerc);
+        Charts.attendanceChart('pieChart', presentDays, absentDays, lateDays);
+      }, 100);
+    }
+  </script>
+</body>
+</html>

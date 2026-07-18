@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/charts.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allMarks = [];
+    let allAttendance = [];
+    let allStudents = [];
+
+    initDashboard('faculty', 'analytics');
+    setTimeout(loadData, 400);
+
+    async function loadData() {
+      try {
+        [allMarks, allAttendance, allStudents] = await Promise.all([
+          DB.getAll('marks'),
+          DB.getAll('attendance'),
+          DB.getAll('students', [DB.where('status', '==', 'active')])
+        ]);
+      } catch (e) { allMarks = []; allAttendance = []; allStudents = []; }
+      renderPage();
+    }
+
+    function getGrade(total) {
+      if (total >= 90) return 'A+';
+      if (total >= 80) return 'A';
+      if (total >= 70) return 'B+';
+      if (total >= 60) return 'B';
+      if (total >= 50) return 'C';
+      if (total >= 40) return 'D';
+      return 'F';
+    }
+
+    function renderPage() {
+      const totalStudents = allStudents.length;
+      const totalMarks = allMarks.length;
+      const avgScore = totalMarks > 0 ? Math.round(allMarks.reduce((sum, m) => sum + (parseInt(m.unit1) || 0) + (parseInt(m.unit2) || 0) + (parseInt(m.unit3) || 0), 0) / totalMarks) : 0;
+      const totalAtt = allAttendance.length;
+      const presentAtt = allAttendance.filter(a => a.status === 'present').length;
+      const attPerc = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 0;
+
+      const subjectScores = {};
+      allMarks.forEach(m => {
+        if (!subjectScores[m.subject]) subjectScores[m.subject] = { total: 0, count: 0 };
+        subjectScores[m.subject].total += (parseInt(m.unit1) || 0) + (parseInt(m.unit2) || 0) + (parseInt(m.unit3) || 0);
+        subjectScores[m.subject].count++;
+      });
+
+      const subjectLabels = Object.keys(subjectScores).slice(0, 8);
+      const subjectAvgs = subjectLabels.map(s => Math.round(subjectScores[s].total / subjectScores[s].count));
+
+      const gradeDistribution = { 'A+': 0, 'A': 0, 'B+': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0 };
+      allMarks.forEach(m => {
+        const total = (parseInt(m.unit1) || 0) + (parseInt(m.unit2) || 0) + (parseInt(m.unit3) || 0);
+        const grade = getGrade(total);
+        gradeDistribution[grade] = (gradeDistribution[grade] || 0) + 1;
+      });
+
+      const yearCounts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+      allStudents.forEach(s => { if (yearCounts[s.year] !== undefined) yearCounts[s.year]++; });
+
+      const content = `
+        ${Components.pageHeader('Student Performance Analytics', 'Insights across all students', '')}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#128100;', totalStudents, 'Total Students', 'primary', 0)}
+          ${Components.statCard('&#128202;', totalMarks, 'Marks Records', 'success', 100)}
+          ${Components.statCard('&#128200;', avgScore, 'Avg Score', 'warning', 200)}
+          ${Components.statCard('&#9745;', attPerc + '%', 'Attendance %', 'accent', 300)}
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-2">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Subject-wise Average</h3>
+            <div style="height:280px;position:relative"><canvas id="subjectChart"></canvas></div>
+          </div>
+          <div class="card animate-fade-in-up stagger-3">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Grade Distribution</h3>
+            <div style="height:280px;position:relative"><canvas id="gradeChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-4">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Students by Year</h3>
+            <div style="height:260px;position:relative"><canvas id="yearChart"></canvas></div>
+          </div>
+          <div class="card animate-fade-in-up stagger-5">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Top Performers</h3>
+            <div style="max-height:260px;overflow-y:auto">
+              ${(() => {
+                const studentScores = {};
+                allMarks.forEach(m => {
+                  const key = m.studentId || m.studentName;
+                  if (!key) return;
+                  if (!studentScores[key]) studentScores[key] = { name: m.studentName || 'Unknown', total: 0, count: 0 };
+                  studentScores[key].total += (parseInt(m.unit1) || 0) + (parseInt(m.unit2) || 0) + (parseInt(m.unit3) || 0);
+                  studentScores[key].count++;
+                });
+                const sorted = Object.values(studentScores).sort((a, b) => (b.total / b.count) - (a.total / a.count)).slice(0, 8);
+                return sorted.length ? sorted.map((s, i) => `
+                  <div class="flex items-center gap-3" style="padding:10px;${i % 2 === 0 ? 'background:var(--bg-tertiary);' : ''}border-radius:var(--radius-sm)">
+                    <div style="width:24px;height:24px;border-radius:50%;background:${i < 3 ? 'var(--primary)' : 'var(--bg-secondary)'};color:${i < 3 ? 'white' : 'var(--text-secondary)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:var(--font-semibold)">${i + 1}</div>
+                    <div style="flex:1;font-size:var(--font-size-sm);font-weight:var(--font-medium)">${Utils.escapeHtml(s.name)}</div>
+                    <div style="font-size:var(--font-size-sm);font-weight:var(--font-semibold);color:var(--primary)">${Math.round(s.total / s.count)}</div>
+                  </div>
+                `).join('') : Components.emptyState('&#127942;', 'No Data', 'No marks data available yet.');
+              })()}
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+
+      setTimeout(() => {
+        Charts.barChart && Charts.barChart('subjectChart');
+        Charts.create('subjectChart', {
+          type: 'bar',
+          data: {
+            labels: subjectLabels.length ? subjectLabels.map(s => s.length > 15 ? s.substring(0, 15) + '...' : s) : ['No Data'],
+            datasets: [{
+              label: 'Average Score',
+              data: subjectAvgs.length ? subjectAvgs : [0],
+              backgroundColor: 'rgba(37, 99, 235, 0.8)',
+              borderRadius: 6,
+              borderSkipped: false
+            }]
+          },
+          options: { ...Charts.getDefaults(), plugins: { legend: { display: false } } }
+        });
+
+        Charts.create('gradeChart', {
+          type: 'doughnut',
+          data: {
+            labels: Object.keys(gradeDistribution),
+            datasets: [{
+              data: Object.values(gradeDistribution),
+              backgroundColor: ['#22C55E', '#06B6D4', '#3B82F6', '#8B5CF6', '#F59E0B', '#F97316', '#EF4444'],
+              borderWidth: 0,
+              borderRadius: 4
+            }]
+          },
+          options: Charts.doughnutDefaults()
+        });
+
+        Charts.create('yearChart', {
+          type: 'bar',
+          data: {
+            labels: ['I Year', 'II Year', 'III Year', 'IV Year'],
+            datasets: [{
+              label: 'Students',
+              data: [yearCounts[1], yearCounts[2], yearCounts[3], yearCounts[4]],
+              backgroundColor: ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B'],
+              borderRadius: 6,
+              borderSkipped: false
+            }]
+          },
+          options: { ...Charts.getDefaults(), plugins: { legend: { display: false } } }
+        });
+      }, 100);
+    }
+  </script>
+</body>
+</html>

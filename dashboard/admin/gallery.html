@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gallery - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+  <style>
+    .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px}
+    .gallery-item{border-radius:var(--radius-lg);overflow:hidden;background:var(--bg-secondary);transition:transform 0.2s,box-shadow 0.2s;cursor:pointer}
+    .gallery-item:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+    .gallery-item-img{width:100%;height:200px;object-fit:cover;background:var(--gradient-primary);display:flex;align-items:center;justify-content:center;font-size:48px;color:white}
+    .gallery-item-info{padding:16px}
+    .gallery-item-title{font-weight:var(--font-semibold);font-size:var(--font-size-sm);margin-bottom:4px}
+    .gallery-item-meta{font-size:var(--font-size-xs);color:var(--text-secondary)}
+    .gallery-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+    .gallery-overlay.active{display:flex}
+    .gallery-overlay img{max-width:90%;max-height:85vh;border-radius:var(--radius-lg)}
+    .gallery-overlay-close{position:absolute;top:20px;right:20px;color:white;font-size:28px;cursor:pointer;background:none;border:none}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allImages = [];
+    let filteredImages = [];
+    let activeCategory = '';
+    const categories = ['Events', 'Symposium', 'Workshop', 'Placement', 'Culturals', 'Sports'];
+
+    initDashboard('admin', 'gallery');
+    setTimeout(loadGallery, 400);
+
+    async function loadGallery() {
+      try { allImages = await DB.getAll('gallery', [DB.orderBy('createdAt', 'desc')]); }
+      catch (e) { allImages = []; }
+      filteredImages = [...allImages];
+      renderPage();
+    }
+
+    function getCategoryGradient(cat) {
+      const gradients = {
+        'Events': 'var(--gradient-primary)', 'Symposium': 'var(--gradient-accent)',
+        'Workshop': 'var(--gradient-success)', 'Placement': 'var(--gradient-purple)',
+        'Culturals': 'var(--gradient-warning)', 'Sports': 'linear-gradient(135deg, #EF4444, #F59E0B)'
+      };
+      return gradients[cat] || 'var(--gradient-primary)';
+    }
+
+    function renderPage() {
+      const content = `
+        ${Components.pageHeader('Photo Gallery', `${filteredImages.length} photos`, `
+          <button class="btn btn-primary btn-sm" onclick="showUploadModal()">+ Upload Photo</button>
+        `)}
+
+        <div class="flex gap-2 mb-6" style="flex-wrap:wrap">
+          <button class="btn btn-sm ${!activeCategory ? 'btn-primary' : 'btn-outline'}" onclick="filterGallery('')">All</button>
+          ${categories.map(c => `<button class="btn btn-sm ${activeCategory === c ? 'btn-primary' : 'btn-outline'}" onclick="filterGallery('${c}')">${c}</button>`).join('')}
+        </div>
+
+        <div class="gallery-grid">
+          ${filteredImages.length ? filteredImages.map(img => `
+            <div class="gallery-item animate-fade-in-up">
+              ${img.url ? `<img src="${Utils.escapeHtml(img.url)}" alt="${Utils.escapeHtml(img.title)}" style="width:100%;height:200px;object-fit:cover" onerror="this.outerHTML='<div class=\\'gallery-item-img\\' style=\\'background:${getCategoryGradient(img.category)}\\'>&#128248;</div>'">` : `<div class="gallery-item-img" style="background:${getCategoryGradient(img.category)}">&#128248;</div>`}
+              <div class="gallery-item-info">
+                <div class="gallery-item-title">${Utils.escapeHtml(img.title || 'Untitled')}</div>
+                <div class="gallery-item-meta flex items-center gap-2">
+                  <span class="badge badge-primary" style="font-size:10px">${Utils.escapeHtml(img.category || 'General')}</span>
+                  <span>${Utils.formatDate(img.date) || 'N/A'}</span>
+                </div>
+                ${img.description ? `<p style="font-size:var(--font-size-xs);color:var(--text-secondary);margin-top:8px">${Utils.escapeHtml(Utils.truncate(img.description, 80))}</p>` : ''}
+                <div class="flex gap-2" style="margin-top:12px">
+                  <button class="btn btn-ghost btn-sm" onclick="editImage('${img.id}')">&#9998; Edit</button>
+                  <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteImage('${img.id}','${Utils.escapeHtml(img.title)}')">&#128465; Delete</button>
+                </div>
+              </div>
+            </div>
+          `).join('') : `<div style="grid-column:1/-1">${Components.emptyState('&#128248;', 'No Photos', 'Upload photos to get started.')}</div>`}
+        </div>
+
+        <div class="modal-overlay" id="galleryModal">
+          <div class="modal">
+            <div class="modal-header">
+              <h3 class="modal-title" id="galleryModalTitle">Upload Photo</h3>
+              <button class="modal-close" onclick="Utils.hideModal('galleryModal')">&#10005;</button>
+            </div>
+            <div class="modal-body">
+              <form id="galleryForm" onsubmit="saveImage(event)">
+                <input type="hidden" id="editImageId">
+                <div class="form-group"><label class="form-label">Title <span class="required">*</span></label><input type="text" class="form-input" id="galTitle" required placeholder="Photo title"></div>
+                <div class="grid grid-2" style="gap:12px">
+                  <div class="form-group"><label class="form-label">Category</label>
+                    <select class="form-input form-select" id="galCategory">
+                      ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="galDate"></div>
+                </div>
+                <div class="form-group"><label class="form-label">Image URL</label><input type="url" class="form-input" id="galUrl" placeholder="https://... or paste image URL"></div>
+                <div class="form-group"><label class="form-label">Or Upload File</label><input type="file" class="form-input" id="galFile" accept="image/*" onchange="handleFilePreview(event)"></div>
+                <div id="galPreview" style="display:none;margin-top:8px"><img style="max-width:100%;max-height:200px;border-radius:var(--radius-sm)" id="galPreviewImg"></div>
+                <div class="form-group"><label class="form-label">Description</label><textarea class="form-input form-textarea" id="galDesc" rows="2" placeholder="Photo description"></textarea></div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" onclick="Utils.hideModal('galleryModal')">Cancel</button>
+              <button class="btn btn-primary" onclick="document.getElementById('galleryForm').requestSubmit()">Save</button>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function showUploadModal() {
+      document.getElementById('galleryModalTitle').textContent = 'Upload Photo';
+      document.getElementById('editImageId').value = '';
+      document.getElementById('galleryForm').reset();
+      document.getElementById('galPreview').style.display = 'none';
+      document.getElementById('galDate').value = new Date().toISOString().split('T')[0];
+      Utils.showModal('galleryModal');
+    }
+
+    function editImage(id) {
+      const img = allImages.find(x => x.id === id);
+      if (!img) return;
+      document.getElementById('galleryModalTitle').textContent = 'Edit Photo';
+      document.getElementById('editImageId').value = id;
+      document.getElementById('galTitle').value = img.title || '';
+      document.getElementById('galCategory').value = img.category || 'Events';
+      document.getElementById('galDate').value = img.date || '';
+      document.getElementById('galUrl').value = img.url || '';
+      document.getElementById('galDesc').value = img.description || '';
+      if (img.url) {
+        document.getElementById('galPreviewImg').src = img.url;
+        document.getElementById('galPreview').style.display = 'block';
+      }
+      Utils.showModal('galleryModal');
+    }
+
+    function handleFilePreview(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        document.getElementById('galPreviewImg').src = ev.target.result;
+        document.getElementById('galPreview').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function saveImage(e) {
+      e.preventDefault();
+      const id = document.getElementById('editImageId').value;
+      const fileInput = document.getElementById('galFile');
+      let imageUrl = document.getElementById('galUrl').value.trim();
+
+      if (fileInput.files[0] && !imageUrl) {
+        try {
+          const file = fileInput.files[0];
+          const path = `gallery/${Date.now()}_${file.name}`;
+          const ref = firebase.storage().ref(path);
+          await ref.put(file);
+          imageUrl = await ref.getDownloadURL();
+        } catch (err) {
+          Toast.error('Upload Error', 'Failed to upload image: ' + err.message);
+          return;
+        }
+      }
+
+      const data = {
+        title: Utils.sanitize(document.getElementById('galTitle').value),
+        category: document.getElementById('galCategory').value,
+        date: document.getElementById('galDate').value,
+        url: imageUrl,
+        description: Utils.sanitize(document.getElementById('galDesc').value),
+        uploadedBy: Auth.getCurrentUser()?.displayName || 'Admin'
+      };
+      if (!data.title) { Toast.warning('Required', 'Title is required'); return; }
+      try {
+        if (id) { await DB.update('gallery', id, data); Toast.success('Updated', 'Photo updated'); }
+        else { await DB.add('gallery', data); Toast.success('Uploaded', 'Photo added to gallery'); }
+        Utils.hideModal('galleryModal');
+        loadGallery();
+      } catch (err) { Toast.error('Error', err.message); }
+    }
+
+    async function deleteImage(id, title) {
+      confirmDelete(`Delete photo "${title}"?`, async () => {
+        try { await DB.remove('gallery', id); Toast.success('Deleted', 'Photo removed'); loadGallery(); }
+        catch (e) { Toast.error('Error', e.message); }
+      });
+    }
+
+    function filterGallery(cat) {
+      activeCategory = cat;
+      filteredImages = cat ? allImages.filter(i => i.category === cat) : [...allImages];
+      renderPage();
+    }
+  </script>
+</body>
+</html>

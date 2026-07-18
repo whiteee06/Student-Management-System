@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI&DS Student Management System | AVS College of Technology</title>
+  <link rel="stylesheet" href="assets/css/main.css">
+  <link rel="stylesheet" href="assets/css/home.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="navbar-brand">
+      <div class="navbar-brand-icon">AI</div>
+      <span>AI&DS SMS</span>
+    </div>
+    <div class="navbar-links">
+      <a href="#about" class="navbar-link">About</a>
+      <a href="#faculty" class="navbar-link">Faculty</a>
+      <a href="#stats" class="navbar-link">Statistics</a>
+      <a href="#events" class="navbar-link">Events</a>
+      <a href="#news" class="navbar-link">News</a>
+      <a href="#contact" class="navbar-link">Contact</a>
+      <a href="login.html" class="btn btn-primary btn-sm" style="margin-left:8px">Sign In</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">&#127891; Department of Artificial Intelligence & Data Science</div>
+      <h1 class="hero-title">
+        Welcome to <span class="highlight">AI&DS</span><br>Student Management System
+      </h1>
+      <p class="hero-subtitle">
+        A modern, secure, and comprehensive platform for managing academic activities at AVS College of Technology, Salem.
+      </p>
+      <div class="hero-actions">
+        <a href="login.html" class="btn btn-primary">&#128274; Sign In</a>
+        <a href="register.html" class="btn btn-glass" style="color:white;border-color:rgba(255,255,255,0.2)">&#128221; Register</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="hero-stat-value" id="heroStudents">0</div>
+          <div class="hero-stat-label">Students</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value" id="heroFaculty">0</div>
+          <div class="hero-stat-label">Faculty</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value" id="heroEvents">0</div>
+          <div class="hero-stat-label">Events</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value" id="heroPlacements">0%</div>
+          <div class="hero-stat-label">Placement Rate</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- About -->
+  <section class="section" id="about">
+    <div class="section-header">
+      <div class="section-badge">&#128218; About Us</div>
+      <h2 class="section-title">Department of AI & Data Science</h2>
+      <p class="section-subtitle">Empowering students with cutting-edge knowledge in Artificial Intelligence and Data Science</p>
+    </div>
+    <div class="about-grid">
+      <div class="about-card animate-fade-in-up">
+        <div class="about-card-icon" style="background:rgba(37,99,235,0.1);color:#2563EB">&#128161;</div>
+        <h3 class="about-card-title">Vision</h3>
+        <p class="about-card-text">To be a nationally recognized center of excellence in Artificial Intelligence and Data Science, producing innovative leaders who drive technological advancement for societal benefit.</p>
+      </div>
+      <div class="about-card animate-fade-in-up stagger-1">
+        <div class="about-card-icon" style="background:rgba(6,182,212,0.1);color:#06B6D4">&#127919;</div>
+        <h3 class="about-card-title">Mission</h3>
+        <p class="about-card-text">To provide world-class education in AI and Data Science through innovative teaching, cutting-edge research, and industry collaboration, nurturing creative problem-solvers.</p>
+      </div>
+      <div class="about-card animate-fade-in-up stagger-2">
+        <div class="about-card-icon" style="background:rgba(34,197,94,0.1);color:#22C55E">&#9989;</div>
+        <h3 class="about-card-title">Objectives</h3>
+        <p class="about-card-text">To equip students with practical AI skills, foster research mindset, promote interdisciplinary learning, and build industry-ready professionals with strong ethical values.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Faculty -->
+  <section class="section section-alt" id="faculty">
+    <div class="section-header">
+      <div class="section-badge">&#128105; Our Team</div>
+      <h2 class="section-title">Faculty Highlights</h2>
+      <p class="section-subtitle">Learn from experienced and dedicated educators</p>
+    </div>
+    <div class="faculty-grid">
+      <div class="faculty-card">
+        <div class="faculty-avatar">HS</div>
+        <h3 class="faculty-name"> H. Shankar</h3>
+        <p class="faculty-designation">Head of Department</p>
+        <p class="faculty-subject">Machine Learning & AI</p>
+      </div>
+      <div class="faculty-card">
+        <div class="faculty-avatar" style="background:var(--gradient-accent)">SP</div>
+        <h3 class="faculty-name">Ms. S. Priya</h3>
+        <p class="faculty-designation">Assistant Professor</p>
+        <p class="faculty-subject">Data Science & Analytics</p>
+      </div>
+      <div class="faculty-card">
+        <div class="faculty-avatar" style="background:var(--gradient-success)">RK</div>
+        <h3 class="faculty-name">Mr. R. Kumar</h3>
+        <p class="faculty-designation">Assistant Professor</p>
+        <p class="faculty-subject">Deep Learning & NLP</p>
+      </div>
+      <div class="faculty-card">
+        <div class="faculty-avatar" style="background:var(--gradient-purple)">VM</div>
+        <h3 class="faculty-name">Ms. V. Meena</h3>
+        <p class="faculty-designation">Assistant Professor</p>
+        <p class="faculty-subject">Cloud Computing & Big Data</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Statistics -->
+  <section class="section" id="stats">
+    <div class="section-header">
+      <div class="section-badge">&#128200; Our Numbers</div>
+      <h2 class="section-title">Department Statistics</h2>
+      <p class="section-subtitle">Our achievements speak for themselves</p>
+    </div>
+    <div class="stats-grid">
+      <div class="stats-card">
+        <div class="stats-card-value">63+</div>
+        <div class="stats-card-label">Students Enrolled</div>
+      </div>
+      <div class="stats-card" style="background:var(--gradient-accent)">
+        <div class="stats-card-value">6+</div>
+        <div class="stats-card-label">Expert Faculty</div>
+      </div>
+      <div class="stats-card" style="background:var(--gradient-success)">
+        <div class="stats-card-value">0%</div>
+        <div class="stats-card-label">Placement Rate</div>
+      </div>
+      <div class="stats-card" style="background:var(--gradient-purple)">
+        <div class="stats-card-value">50+</div>
+        <div class="stats-card-label">Research Papers</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Events -->
+  <section class="section section-alt" id="events">
+    <div class="section-header">
+      <div class="section-badge">&#127891; What's Happening</div>
+      <h2 class="section-title">Upcoming Events</h2>
+      <p class="section-subtitle">Stay updated with our latest activities</p>
+    </div>
+    <div class="events-grid">
+      <div class="event-card">
+        <div class="event-card-image" style="background:var(--gradient-primary)">&#128187;</div>
+        <div class="event-card-body">
+          <div class="event-card-date">&#128197; August 15, 2026</div>
+          <h3 class="event-card-title">National AI Symposium 2026</h3>
+          <p class="event-card-text">A two-day national symposium on recent advances in Artificial Intelligence and Machine Learning.</p>
+        </div>
+      </div>
+      <div class="event-card">
+        <div class="event-card-image" style="background:var(--gradient-accent)">&#128188;</div>
+        <div class="event-card-body">
+          <div class="event-card-date">&#128197; September 5, 2026</div>
+          <h3 class="event-card-title">Data Science Workshop</h3>
+          <p class="event-card-text">Hands-on workshop on Data Analytics using Python and TensorFlow for real-world applications.</p>
+        </div>
+      </div>
+      <div class="event-card">
+        <div class="event-card-image" style="background:var(--gradient-success)">&#127942;</div>
+        <div class="event-card-body">
+          <div class="event-card-date">&#128197; October 20, 2026</div>
+          <h3 class="event-card-title">Campus Placement Drive</h3>
+          <p class="event-card-text">Major IT companies visiting campus for final year placement including TCS, Infosys, and Wipro.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- News -->
+  <section class="section" id="news">
+    <div class="section-header">
+      <div class="section-badge">&#128240; Latest Updates</div>
+      <h2 class="section-title">News & Announcements</h2>
+      <p class="section-subtitle">Stay informed with the latest happenings</p>
+    </div>
+    <div class="news-list">
+      <div class="news-item">
+        <div class="news-date">
+          <span class="news-date-day">12</span>
+          <span class="news-date-month">Jul</span>
+        </div>
+        <div>
+          <h3 class="news-title">Hackathon Winners Announced</h3>
+          <p class="news-text">Our students secured first place in the State-level AI Hackathon held at Anna University.</p>
+          <span class="news-tag badge-primary badge">&#127942; Achievement</span>
+        </div>
+      </div>
+      <div class="news-item">
+        <div class="news-date">
+          <span class="news-date-day">05</span>
+          <span class="news-date-month">Jul</span>
+        </div>
+        <div>
+          <h3 class="news-title">New AI Lab Inaugurated</h3>
+          <p class="news-text">State-of-the-art AI & Deep Learning laboratory with GPU clusters has been inaugurated.</p>
+          <span class="news-tag badge-success badge">&#127941; Infrastructure</span>
+        </div>
+      </div>
+      <div class="news-item">
+        <div class="news-date">
+          <span class="news-date-day">28</span>
+          <span class="news-date-month">Jun</span>
+        </div>
+        <div>
+          <h3 class="news-title">Summer Internship Program</h3>
+          <p class="news-text">Applications are open for summer internship program 2026. Apply before July 20th.</p>
+          <span class="news-tag badge-warning badge">&#128221; Announcement</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact -->
+  <section class="section section-alt" id="contact">
+    <div class="section-header">
+      <div class="section-badge">&#128222; Get in Touch</div>
+      <h2 class="section-title">Contact Us</h2>
+      <p class="section-subtitle">We're here to help and answer your questions</p>
+    </div>
+    <div class="contact-grid">
+      <div class="contact-card">
+        <div class="contact-icon">&#127968;</div>
+        <h3 class="contact-title">Address</h3>
+        <p class="contact-text">AVS College of Technology<br>Salem - 636106<br>Tamil Nadu, India</p>
+      </div>
+      <div class="contact-card">
+        <div class="contact-icon" style="background:rgba(34,197,94,0.1)">&#128222;</div>
+        <h3 class="contact-title">Phone</h3>
+        <p class="contact-text">HOD: +91 9944627280<br>Student: +91 9952281794<br>Email:nithiarasu248@gmail.com</p>
+      </div>
+      <div class="contact-card">
+        <div class="contact-icon" style="background:rgba(6,182,212,0.1)">&#127760;</div>
+        <h3 class="contact-title">Online</h3>
+        <p class="contact-text">Website: www.avsct.ac.in<br>Facebook: /avscsalem<br>LinkedIn: /avs-college</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand">
+          <div class="navbar-brand-icon" style="width:36px;height:36px;font-size:16px">AI</div>
+          <span>AI&DS SMS</span>
+        </div>
+        <p class="footer-desc">A comprehensive Student Management System for the Department of Artificial Intelligence & Data Science, AVS College of Technology, Salem.</p>
+        <p class="footer-developer">Developed by <strong>G. Nithiarasu</strong></p>
+        <p class="footer-developer" style="margin-top:4px">Special Credits: <strong>D. Kiruthika</strong> & <strong>C. Amirtha Dharshini</strong></p>
+      </div>
+      <div>
+        <h4 class="footer-title">Quick Links</h4>
+        <div class="footer-links">
+          <a href="#about" class="footer-link">About</a>
+          <a href="#faculty" class="footer-link">Faculty</a>
+          <a href="#events" class="footer-link">Events</a>
+          <a href="#contact" class="footer-link">Contact</a>
+        </div>
+      </div>
+      <div>
+        <h4 class="footer-title">Resources</h4>
+        <div class="footer-links">
+          <a href="login.html" class="footer-link">Student Login</a>
+          <a href="login.html" class="footer-link">Faculty Login</a>
+          <a href="login.html" class="footer-link">Parent Login</a>
+          <a href="register.html" class="footer-link">Register</a>
+        </div>
+      </div>
+      <div>
+        <h4 class="footer-title">Department</h4>
+        <div class="footer-links">
+          <a href="#" class="footer-link">AI & Machine Learning</a>
+          <a href="#" class="footer-link">Data Science</a>
+          <a href="#" class="footer-link">Deep Learning</a>
+          <a href="#" class="footer-link">Cloud Computing</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-copyright">&copy; 2026 AI&DS Student Management System. Department of AI & Data Science, AVS College of Technology, Salem.</p>
+      <p class="footer-developer">Built with &#10084; by <strong>G. Nithiarasu</strong></p>
+    </div>
+  </footer>
+
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/utils.js"></script>
+  <script>
+    Theme.init();
+
+    // Navbar scroll
+    window.addEventListener('scroll', () => {
+      document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
+    });
+
+    // Animate stats
+    function animateValue(el, end, suffix = '') {
+      let start = 0;
+      const duration = 2000;
+      const step = (timestamp) => {
+        if (!start) start = timestamp;
+        const progress = Math.min((timestamp - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = Math.floor(eased * end) + suffix;
+        if (progress < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          animateValue(document.getElementById('heroStudents'), 180, '+');
+          animateValue(document.getElementById('heroFaculty'), 15, '+');
+          animateValue(document.getElementById('heroEvents'), 25, '+');
+          animateValue(document.getElementById('heroPlacements'), 95, '%');
+          observer.disconnect();
+        }
+      });
+    }, { threshold: 0.3 });
+    observer.observe(document.querySelector('.hero-stats'));
+
+    // Smooth scroll
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    // Observe sections for animation
+    Utils.observeAndAnimate('.about-card, .faculty-card, .stats-card, .event-card, .contact-card');
+  </script>
+</body>
+</html>

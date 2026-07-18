@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance Overview - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/charts.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allAttendance = [];
+    let filteredAttendance = [];
+    let allStudents = [];
+    let currentPage = 1;
+    const perPage = 15;
+    let filterDate = '';
+    let filterYear = '';
+    let filterSection = '';
+
+    initDashboard('admin', 'attendance');
+    setTimeout(loadAll, 400);
+
+    async function loadAll() {
+      try {
+        [allAttendance, allStudents] = await Promise.all([
+          DB.getAll('attendance', [DB.orderBy('date', 'desc')]),
+          DB.getAll('students', [DB.orderBy('name', 'asc')])
+        ]);
+      } catch (e) { allAttendance = []; allStudents = []; }
+      filteredAttendance = [...allAttendance];
+      renderPage();
+    }
+
+    function applyFilters() {
+      filterDate = document.getElementById('attFilterDate')?.value || '';
+      filterYear = document.getElementById('filter_year')?.value || '';
+      filterSection = document.getElementById('filter_section')?.value || '';
+      filteredAttendance = allAttendance.filter(a => {
+        if (filterDate && a.date !== filterDate) return false;
+        if (filterYear && a.year !== filterYear) return false;
+        if (filterSection && a.section !== filterSection) return false;
+        return true;
+      });
+      currentPage = 1;
+      renderPage();
+    }
+
+    function calculateStudentStats() {
+      const stats = {};
+      allAttendance.forEach(a => {
+        const key = a.registerNumber || a.studentId;
+        if (!key) return;
+        if (!stats[key]) stats[key] = { name: a.studentName || 'Unknown', regNo: a.registerNumber || key, total: 0, present: 0 };
+        stats[key].total++;
+        if (a.status === 'present') stats[key].present++;
+      });
+      return Object.values(stats).sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    function renderPage() {
+      const start = (currentPage - 1) * perPage;
+      const pageData = filteredAttendance.slice(start, start + perPage);
+      const totalPresent = filteredAttendance.filter(a => a.status === 'present').length;
+      const totalAbsent = filteredAttendance.filter(a => a.status === 'absent').length;
+      const totalLate = filteredAttendance.filter(a => a.status === 'late').length;
+      const totalRecords = filteredAttendance.length;
+      const overallPerc = totalRecords ? Math.round((totalPresent / totalRecords) * 100) : 0;
+
+      const content = `
+        ${Components.pageHeader('Attendance Overview', `${filteredAttendance.length} records`, `
+          <button class="btn btn-outline btn-sm" onclick="exportAttendance()">&#128194; Export CSV</button>
+        `)}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#9745;', totalRecords, 'Total Records', 'primary', 0)}
+          ${Components.statCard('&#10004;', totalPresent, 'Present', 'success', 100)}
+          ${Components.statCard('&#10006;', totalAbsent, 'Absent', 'danger', 200)}
+          ${Components.statCard('&#128200;', overallPerc + '%', 'Attendance %', 'warning', 300)}
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-2">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Overall Distribution</h3>
+            <div style="height:260px;position:relative"><canvas id="attDistChart"></canvas></div>
+          </div>
+          <div class="card animate-fade-in-up stagger-3">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Attendance by Year</h3>
+            <div style="height:260px;position:relative"><canvas id="attYearChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="card mb-4" style="padding:16px">
+          <div class="flex items-center gap-3" style="flex-wrap:wrap">
+            <input type="date" class="form-input" style="width:auto;min-width:160px" id="attFilterDate" onchange="applyFilters()">
+            <select class="form-input form-select" style="width:auto;min-width:120px" id="filter_year" onchange="applyFilters()">
+              <option value="">All Years</option>
+              <option value="1">I Year</option><option value="2">II Year</option><option value="3">III Year</option><option value="4">IV Year</option>
+            </select>
+            <select class="form-input form-select" style="width:auto;min-width:120px" id="filter_section" onchange="applyFilters()">
+              <option value="">All Sections</option>
+              <option value="A">Section A</option><option value="B">Section B</option><option value="C">Section C</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="clearAttFilters()">Clear</button>
+          </div>
+        </div>
+
+        <div class="card mb-6" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Reg. No</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Year / Section</th>
+                  <th>Subject</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pageData.length ? pageData.map(a => `
+                  <tr>
+                    <td style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(a.studentName || 'N/A')}</td>
+                    <td><span style="font-family:monospace;font-size:var(--font-size-sm)">${Utils.escapeHtml(a.registerNumber || 'N/A')}</span></td>
+                    <td>${Utils.formatDate(a.date) || 'N/A'}</td>
+                    <td><span class="badge ${a.status === 'present' ? 'badge-success' : a.status === 'absent' ? 'badge-danger' : 'badge-warning'}">${Utils.capitalize(a.status || 'N/A')}</span></td>
+                    <td><span class="badge badge-primary">${a.year || '-'} / ${a.section || '-'}</span></td>
+                    <td>${Utils.escapeHtml(a.subject || 'N/A')}</td>
+                  </tr>
+                `).join('') : `<tr><td colspan="6">${Components.emptyState('&#9745;', 'No Records', 'No attendance records found.')}</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        ${Components.pagination(filteredAttendance.length, perPage, currentPage, 'goToPage')}
+
+        <div class="card mb-6">
+          <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Student Attendance Summary</h3>
+          <div class="table-container">
+            <table class="table" id="studentSummaryTable">
+              <thead>
+                <tr><th>Student</th><th>Reg. No</th><th>Total Classes</th><th>Present</th><th>Absent/Late</th><th>Percentage</th></tr>
+              </thead>
+              <tbody>
+                ${(() => {
+                  const stats = calculateStudentStats();
+                  return stats.length ? stats.slice(0, 20).map(s => {
+                    const perc = s.total ? Math.round((s.present / s.total) * 100) : 0;
+                    const badgeClass = perc >= 75 ? 'badge-success' : perc >= 50 ? 'badge-warning' : 'badge-danger';
+                    return `<tr>
+                      <td style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(s.name)}</td>
+                      <td><span style="font-family:monospace;font-size:var(--font-size-sm)">${Utils.escapeHtml(s.regNo)}</span></td>
+                      <td>${s.total}</td>
+                      <td>${s.present}</td>
+                      <td>${s.total - s.present}</td>
+                      <td><span class="badge ${badgeClass}">${perc}%</span></td>
+                    </tr>`;
+                  }).join('') : `<tr><td colspan="6">${Components.emptyState('&#128100;', 'No Data', 'No student attendance data available.')}</td></tr>`;
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+
+      setTimeout(() => {
+        Charts.attendanceChart('attDistChart', totalPresent, totalAbsent, totalLate);
+        const yearCounts = { 1: { present: 0, total: 0 }, 2: { present: 0, total: 0 }, 3: { present: 0, total: 0 }, 4: { present: 0, total: 0 } };
+        allAttendance.forEach(a => {
+          if (yearCounts[a.year]) {
+            yearCounts[a.year].total++;
+            if (a.status === 'present') yearCounts[a.year].present++;
+          }
+        });
+        Charts.create('attYearChart', {
+          type: 'bar',
+          data: {
+            labels: ['I Year', 'II Year', 'III Year', 'IV Year'],
+            datasets: [{
+              label: 'Attendance %',
+              data: [1,2,3,4].map(y => yearCounts[y].total ? Math.round((yearCounts[y].present / yearCounts[y].total) * 100) : 0),
+              backgroundColor: ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B'],
+              borderRadius: 6, borderSkipped: false
+            }]
+          },
+          options: { ...Charts.getDefaults(), plugins: { legend: { display: false } } }
+        });
+      }, 100);
+    }
+
+    function clearAttFilters() {
+      filterDate = ''; filterYear = ''; filterSection = '';
+      filteredAttendance = [...allAttendance];
+      currentPage = 1;
+      renderPage();
+    }
+
+    async function exportAttendance() {
+      try {
+        Utils.exportToCSV(filteredAttendance.map(a => ({
+          Student: a.studentName, 'Reg No': a.registerNumber, Date: a.date,
+          Status: a.status, Year: a.year, Section: a.section, Subject: a.subject
+        })), 'attendance_overview');
+        Toast.success('Exported', 'Attendance data downloaded');
+      } catch (e) { Toast.error('Error', e.message); }
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      renderPage();
+    }
+  </script>
+</body>
+</html>

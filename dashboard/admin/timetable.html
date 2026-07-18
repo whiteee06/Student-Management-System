@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timetable - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+  <style>
+    .timetable-grid{width:100%;border-collapse:collapse;table-layout:fixed}
+    .timetable-grid th,.timetable-grid td{border:1px solid var(--border);padding:8px;text-align:center;font-size:var(--font-size-xs)}
+    .timetable-grid th{background:var(--bg-secondary);font-weight:var(--font-semibold);position:sticky;top:0;z-index:1}
+    .timetable-grid td{min-height:60px;vertical-align:top;height:70px}
+    .timetable-grid td.empty-cell{color:var(--text-tertiary);font-style:italic}
+    .tt-entry{background:rgba(37,99,235,0.08);border-radius:var(--radius-sm);padding:6px 8px;margin:2px;text-align:left;font-size:var(--font-size-xs);border-left:3px solid var(--primary);cursor:pointer;transition:background 0.2s}
+    .tt-entry:hover{background:rgba(37,99,235,0.15)}
+    .tt-entry .tt-subject{font-weight:var(--font-semibold);display:block}
+    .tt-entry .tt-faculty{color:var(--text-secondary);font-size:10px}
+    .day-tab{padding:8px 16px;border:1px solid var(--border);background:var(--bg-secondary);cursor:pointer;font-size:var(--font-size-sm);border-radius:var(--radius-sm) var(--radius-sm) 0 0;transition:all 0.2s}
+    .day-tab.active{background:var(--primary);color:white;border-color:var(--primary)}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let timetableEntries = [];
+    let allSubjects = [];
+    let allFaculty = [];
+    let selectedYear = '1';
+    let selectedSection = 'A';
+    const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const periods = [
+      { label: 'Period 1', time: '9:00 - 9:50' },
+      { label: 'Period 2', time: '9:50 - 10:40' },
+      { label: 'Period 3', time: '10:50 - 11:40' },
+      { label: 'Period 4', time: '11:40 - 12:30' },
+      { label: 'Lunch', time: '12:30 - 1:30', isLunch: true },
+      { label: 'Period 5', time: '1:30 - 2:20' },
+      { label: 'Period 6', time: '2:20 - 3:10' },
+      { label: 'Period 7', time: '3:20 - 4:10' }
+    ];
+
+    initDashboard('admin', 'timetable');
+    setTimeout(loadAll, 400);
+
+    async function loadAll() {
+      try {
+        [timetableEntries, allSubjects, allFaculty] = await Promise.all([
+          DB.getAll('timetable', []),
+          DB.getAll('subjects', [DB.orderBy('name', 'asc')]),
+          DB.getAll('faculty', [DB.orderBy('name', 'asc')])
+        ]);
+      } catch (e) { timetableEntries = []; allSubjects = []; allFaculty = []; }
+      renderPage();
+    }
+
+    function getFilteredEntries() {
+      return timetableEntries.filter(e => e.year === selectedYear && e.section === selectedSection);
+    }
+
+    function getEntry(day, periodIndex) {
+      const filtered = getFilteredEntries();
+      return filtered.find(e => e.day === day && e.periodIndex === periodIndex);
+    }
+
+    function renderPage() {
+      const content = `
+        ${Components.pageHeader('Timetable Management', 'Manage weekly class schedules', `
+          <button class="btn btn-outline btn-sm" onclick="exportTableToCSV('timetableTable','timetable')">&#128194; Export</button>
+        `)}
+
+        <div class="card mb-4" style="padding:16px">
+          <div class="flex items-center gap-3" style="flex-wrap:wrap">
+            <select class="form-input form-select" style="width:auto;min-width:140px" id="ttYear" onchange="selectedYear=this.value;renderPage()">
+              <option value="1" ${selectedYear==='1'?'selected':''}>I Year</option>
+              <option value="2" ${selectedYear==='2'?'selected':''}>II Year</option>
+              <option value="3" ${selectedYear==='3'?'selected':''}>III Year</option>
+              <option value="4" ${selectedYear==='4'?'selected':''}>IV Year</option>
+            </select>
+            <select class="form-input form-select" style="width:auto;min-width:140px" id="ttSection" onchange="selectedSection=this.value;renderPage()">
+              <option value="A" ${selectedSection==='A'?'selected':''}>Section A</option>
+              <option value="B" ${selectedSection==='B'?'selected':''}>Section B</option>
+              <option value="C" ${selectedSection==='C'?'selected':''}>Section C</option>
+            </select>
+            <span style="font-size:var(--font-size-sm);color:var(--text-secondary)">${getFilteredEntries().length} entries configured</span>
+          </div>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none;overflow-x:auto">
+            <table class="timetable-grid" id="timetableTable">
+              <thead>
+                <tr>
+                  <th style="width:100px">Day / Period</th>
+                  ${periods.filter(p => !p.isLunch).map(p => `<th style="min-width:120px"><div>${p.label}</div><div style="font-weight:normal;font-size:10px;color:var(--text-secondary)">${p.time}</div></th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                ${days.map(day => `
+                  <tr>
+                    <td style="font-weight:var(--font-semibold);background:var(--bg-secondary)">${day.substring(0,3)}</td>
+                    ${periods.map((p, i) => {
+                      if (p.isLunch) return '';
+                      const entry = getEntry(day, i);
+                      if (entry) {
+                        return `<td onclick="editEntry('${day}',${i})"><div class="tt-entry"><span class="tt-subject">${Utils.escapeHtml(entry.subject || '')}</span><span class="tt-faculty">${Utils.escapeHtml(entry.faculty || '')}</span></div></td>`;
+                      }
+                      return `<td class="empty-cell" onclick="showAddEntry('${day}',${i})"><span style="cursor:pointer;color:var(--primary)">+</span></td>`;
+                    }).join('')}
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="modal-overlay" id="ttModal">
+          <div class="modal">
+            <div class="modal-header">
+              <h3 class="modal-title" id="ttModalTitle">Add Timetable Entry</h3>
+              <button class="modal-close" onclick="Utils.hideModal('ttModal')">&#10005;</button>
+            </div>
+            <div class="modal-body">
+              <form id="ttForm" onsubmit="saveEntry(event)">
+                <input type="hidden" id="editTTEntryId">
+                <input type="hidden" id="ttDay">
+                <input type="hidden" id="ttPeriodIndex">
+                <div class="grid grid-2" style="gap:12px">
+                  <div class="form-group"><label class="form-label">Day</label><input type="text" class="form-input" id="ttDayDisplay" readonly></div>
+                  <div class="form-group"><label class="form-label">Period</label><input type="text" class="form-input" id="ttPeriodDisplay" readonly></div>
+                </div>
+                <div class="form-group"><label class="form-label">Subject <span class="required">*</span></label>
+                  <select class="form-input form-select" id="ttSubject" required>
+                    <option value="">Select Subject</option>
+                    ${allSubjects.map(s => `<option value="${Utils.escapeHtml(s.name)}">${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code || '')})</option>`).join('')}
+                  </select>
+                </div>
+                <div class="form-group"><label class="form-label">Faculty</label>
+                  <select class="form-input form-select" id="ttFaculty">
+                    <option value="">Select Faculty</option>
+                    ${allFaculty.map(f => `<option value="${Utils.escapeHtml(f.name)}">${Utils.escapeHtml(f.name)}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="form-group"><label class="form-label">Room</label><input type="text" class="form-input" id="ttRoom" placeholder="e.g. Room 301"></div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" onclick="Utils.hideModal('ttModal')">Cancel</button>
+              <button class="btn btn-danger btn-sm" id="ttDeleteBtn" onclick="deleteTTEntry()" style="display:none;margin-right:auto">&#128465; Delete</button>
+              <button class="btn btn-primary" onclick="document.getElementById('ttForm').requestSubmit()">Save</button>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function showAddEntry(day, periodIndex) {
+      const p = periods[periodIndex];
+      document.getElementById('ttModalTitle').textContent = 'Add Timetable Entry';
+      document.getElementById('editTTEntryId').value = '';
+      document.getElementById('ttDay').value = day;
+      document.getElementById('ttPeriodIndex').value = periodIndex;
+      document.getElementById('ttDayDisplay').value = day;
+      document.getElementById('ttPeriodDisplay').value = p.label + ' (' + p.time + ')';
+      document.getElementById('ttSubject').value = '';
+      document.getElementById('ttFaculty').value = '';
+      document.getElementById('ttRoom').value = '';
+      document.getElementById('ttDeleteBtn').style.display = 'none';
+      Utils.showModal('ttModal');
+    }
+
+    function editEntry(day, periodIndex) {
+      const entry = getEntry(day, periodIndex);
+      if (!entry) return showAddEntry(day, periodIndex);
+      const p = periods[periodIndex];
+      document.getElementById('ttModalTitle').textContent = 'Edit Timetable Entry';
+      document.getElementById('editTTEntryId').value = entry.id || '';
+      document.getElementById('ttDay').value = day;
+      document.getElementById('ttPeriodIndex').value = periodIndex;
+      document.getElementById('ttDayDisplay').value = day;
+      document.getElementById('ttPeriodDisplay').value = p.label + ' (' + p.time + ')';
+      document.getElementById('ttSubject').value = entry.subject || '';
+      document.getElementById('ttFaculty').value = entry.faculty || '';
+      document.getElementById('ttRoom').value = entry.room || '';
+      document.getElementById('ttDeleteBtn').style.display = 'inline-flex';
+      Utils.showModal('ttModal');
+    }
+
+    async function saveEntry(e) {
+      e.preventDefault();
+      const id = document.getElementById('editTTEntryId').value;
+      const data = {
+        day: document.getElementById('ttDay').value,
+        periodIndex: parseInt(document.getElementById('ttPeriodIndex').value),
+        subject: document.getElementById('ttSubject').value,
+        faculty: document.getElementById('ttFaculty').value,
+        room: document.getElementById('ttRoom').value.trim(),
+        year: selectedYear,
+        section: selectedSection
+      };
+      if (!data.subject) { Toast.warning('Required', 'Subject is required'); return; }
+      try {
+        if (id) { await DB.update('timetable', id, data); Toast.success('Updated', 'Entry updated'); }
+        else { await DB.add('timetable', data); Toast.success('Added', 'Entry added'); }
+        Utils.hideModal('ttModal');
+        loadAll();
+      } catch (err) { Toast.error('Error', err.message); }
+    }
+
+    function deleteTTEntry() {
+      const id = document.getElementById('editTTEntryId').value;
+      if (!id) return;
+      confirmDelete('Delete this timetable entry?', async () => {
+        try { await DB.remove('timetable', id); Toast.success('Deleted', 'Entry removed'); Utils.hideModal('ttModal'); loadAll(); }
+        catch (e) { Toast.error('Error', e.message); }
+      });
+    }
+  </script>
+</body>
+</html>

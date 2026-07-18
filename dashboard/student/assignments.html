@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Assignments - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let assignments = [];
+
+    initDashboard('student', 'assignments');
+    setTimeout(loadAssignments, 400);
+
+    async function loadAssignments() {
+      try { assignments = await DB.getAll('assignments', [DB.orderBy('createdAt', 'desc')]); }
+      catch (e) { assignments = []; }
+      renderAssignments();
+    }
+
+    function renderAssignments() {
+      const content = `
+        ${Components.pageHeader('Assignments', `${assignments.length} assignments posted`, '')}
+
+        <div class="grid grid-2" style="gap:20px">
+          ${assignments.length ? assignments.map(a => {
+            const isOverdue = a.deadline && new Date(a.deadline) < new Date();
+            return `
+              <div class="card animate-fade-in-up" style="cursor:default">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold)">${Utils.escapeHtml(a.title)}</h3>
+                  ${isOverdue ? '<span class="badge badge-danger">Overdue</span>' : '<span class="badge badge-success">Active</span>'}
+                </div>
+                ${a.subject ? `<p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:4px"><strong>Subject:</strong> ${Utils.escapeHtml(a.subject)}</p>` : ''}
+                ${a.description ? `<p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:12px">${Utils.escapeHtml(Utils.truncate(a.description, 120))}</p>` : ''}
+                <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:8px">
+                  <div style="font-size:var(--font-size-xs);color:var(--text-tertiary)">
+                    <span>Deadline: ${Utils.formatDate(a.deadline) || 'N/A'}</span>
+                    ${a.uploadedBy ? `<span> | By: ${Utils.escapeHtml(a.uploadedBy)}</span>` : ''}
+                  </div>
+                  <div class="flex gap-2">
+                    ${a.fileUrl ? `<a href="${a.fileUrl}" target="_blank" class="btn btn-primary btn-sm">&#128194; Download</a>` : ''}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('') : Components.emptyState('&#128221;', 'No Assignments', 'No assignments posted yet.')}
+        </div>
+      `;
+      loadPageContent(content);
+    }
+  </script>
+</body>
+</html>

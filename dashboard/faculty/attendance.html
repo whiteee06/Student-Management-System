@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mark Attendance - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let students = [];
+    let attendanceData = {};
+    let todayMarked = false;
+
+    initDashboard('faculty', 'attendance');
+    setTimeout(loadPage, 400);
+
+    async function loadPage() {
+      try {
+        students = await DB.getAll('students', [
+          DB.where('status', '==', 'active'),
+          DB.orderBy('name', 'asc')
+        ]);
+        const today = new Date().toISOString().split('T')[0];
+        const existing = await DB.getAll('attendance', [
+          DB.where('date', '==', today)
+        ]);
+        todayMarked = existing.length > 0;
+        existing.forEach(a => { attendanceData[a.studentId] = a.status; });
+      } catch (e) { students = []; }
+
+      renderPage();
+    }
+
+    function renderPage() {
+      const today = new Date().toISOString().split('T')[0];
+      const content = `
+        ${Components.pageHeader('Mark Attendance', `Date: ${Utils.formatDate(today)}`, todayMarked ? '<span class="badge badge-success">&#10004; Already Marked</span>' : '')}
+
+        <div class="card mb-4" style="padding:16px">
+          <div class="flex items-center gap-3" style="flex-wrap:wrap">
+            <div class="header-search" style="flex:1;min-width:200px">
+              <span class="header-search-icon">&#128269;</span>
+              <input type="text" class="form-input" placeholder="Search students..." style="padding-left:38px" id="searchInput" onkeyup="filterStudents()">
+            </div>
+            <div class="flex gap-2">
+              <button class="btn btn-sm" style="background:rgba(34,197,94,0.1);color:var(--success)" onclick="markAllPresent()">&#10004; All Present</button>
+              <button class="btn btn-primary btn-sm" onclick="submitAttendance()" id="submitBtn" ${todayMarked ? 'disabled' : ''}>&#128190; Save Attendance</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Student</th>
+                  <th>Reg. Number</th>
+                  <th>Year / Section</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="attendanceBody">
+                ${students.map((s, i) => `
+                  <tr data-student-id="${s.id}">
+                    <td>${i + 1}</td>
+                    <td>
+                      <div class="flex items-center gap-3">
+                        <div class="avatar avatar-sm avatar-placeholder" style="font-size:10px">${Utils.getInitials(s.name)}</div>
+                        <span style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(s.name)}</span>
+                      </div>
+                    </td>
+                    <td><span style="font-family:monospace;font-size:var(--font-size-sm)">${Utils.escapeHtml(s.registerNumber || 'N/A')}</span></td>
+                    <td><span class="badge badge-primary">${s.year || '-'}/${s.section || '-'}</span></td>
+                    <td>
+                      <div class="flex gap-1">
+                        <button class="btn btn-sm att-btn ${attendanceData[s.id] === 'present' ? 'btn-success' : 'btn-ghost'}" data-student="${s.id}" data-status="present" onclick="setAttendance('${s.id}','present')" ${todayMarked ? 'disabled' : ''}>P</button>
+                        <button class="btn btn-sm att-btn ${attendanceData[s.id] === 'absent' ? 'btn-danger' : 'btn-ghost'}" data-student="${s.id}" data-status="absent" onclick="setAttendance('${s.id}','absent')" ${todayMarked ? 'disabled' : ''}>A</button>
+                        <button class="btn btn-sm att-btn ${attendanceData[s.id] === 'late' ? 'btn-warning' : 'btn-ghost'}" data-student="${s.id}" data-status="late" onclick="setAttendance('${s.id}','late')" ${todayMarked ? 'disabled' : ''}>L</button>
+                        <button class="btn btn-sm att-btn ${attendanceData[s.id] === 'medical' ? 'btn-outline' : 'btn-ghost'}" data-student="${s.id}" data-status="medical" onclick="setAttendance('${s.id}','medical')" ${todayMarked ? 'disabled' : ''}>ML</button>
+                        <button class="btn btn-sm att-btn ${attendanceData[s.id] === 'od' ? 'btn-outline' : 'btn-ghost'}" data-student="${s.id}" data-status="od" onclick="setAttendance('${s.id}','od')" ${todayMarked ? 'disabled' : ''}>OD</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function setAttendance(studentId, status) {
+      if (todayMarked) return;
+      attendanceData[studentId] = status;
+      document.querySelectorAll(`[data-student="${studentId}"]`).forEach(btn => {
+        btn.className = 'btn btn-sm att-btn btn-ghost';
+      });
+      const activeBtn = document.querySelector(`[data-student="${studentId}"][data-status="${status}"]`);
+      const colorMap = { present: 'btn-success', absent: 'btn-danger', late: 'btn-warning', medical: 'btn-outline', od: 'btn-outline' };
+      if (activeBtn) activeBtn.className = `btn btn-sm att-btn ${colorMap[status]}`;
+    }
+
+    function markAllPresent() {
+      if (todayMarked) return;
+      students.forEach(s => { attendanceData[s.id] = 'present'; });
+      renderPage();
+    }
+
+    async function submitAttendance() {
+      if (todayMarked) return;
+      const unmarked = students.filter(s => !attendanceData[s.id]);
+      if (unmarked.length) {
+        Toast.warning('Incomplete', `${unmarked.length} students have no status selected`);
+        return;
+      }
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.innerHTML = 'Saving...';
+
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const batch = DB.batch();
+        const db = firebase.firestore();
+
+        for (const s of students) {
+          const ref = db.collection('attendance').doc();
+          batch.set(ref, {
+            studentId: s.id,
+            studentName: s.name,
+            registerNumber: s.registerNumber,
+            date: today,
+            status: attendanceData[s.id],
+            markedBy: Auth.getCurrentUser()?.uid,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+        await batch.commit();
+        todayMarked = true;
+        Toast.success('Saved', `Attendance marked for ${students.length} students`);
+        renderPage();
+      } catch (e) {
+        Toast.error('Error', e.message);
+        btn.disabled = false;
+        btn.innerHTML = '&#128190; Save Attendance';
+      }
+    }
+
+    function filterStudents() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      document.querySelectorAll('#attendanceBody tr').forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>

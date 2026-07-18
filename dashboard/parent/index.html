@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parent Dashboard - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/charts.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    initDashboard('parent', 'dashboard');
+
+    setTimeout(async () => {
+      const user = Auth.getCurrentUser();
+      if (!user) return;
+
+      let studentData = null;
+      let attendance = 0, totalDays = 0, notices = 0, leaveStatus = 'None';
+      let studentYear = 'N/A';
+
+      try {
+        const userDoc = await DB.get('users', user.uid);
+        const linkedStudentId = userDoc?.linkedStudentId;
+
+        if (linkedStudentId) {
+          studentData = await DB.get('students', linkedStudentId);
+        }
+
+        if (!studentData) {
+          const parents = await DB.getAll('parents', [DB.where('uid', '==', user.uid)]);
+          if (parents.length && parents[0].linkedStudentId) {
+            studentData = await DB.get('students', parents[0].linkedStudentId);
+          }
+        }
+
+        if (studentData) {
+          studentYear = studentData.year ? `${['I','II','III','IV'][studentData.year - 1] || studentData.year} Year` : 'N/A';
+          const records = await DB.getAll('attendance', [DB.where('studentId', '==', studentData.id)]);
+          totalDays = records.length;
+          attendance = records.filter(r => r.status === 'present').length;
+          const pendingLeaves = await DB.getAll('leave_requests', [
+            DB.where('studentId', '==', studentData.id),
+            DB.where('status', '==', 'pending')
+          ]);
+          if (pendingLeaves.length) leaveStatus = 'Pending';
+
+          const monthlyData = {};
+          records.forEach(r => {
+            const month = new Date(r.date).toLocaleString('default', { month: 'short' });
+            if (!monthlyData[month]) monthlyData[month] = { present: 0, total: 0 };
+            monthlyData[month].total++;
+            if (r.status === 'present') monthlyData[month].present++;
+          });
+        }
+
+        const notifs = await DB.getAll('notifications', [DB.where('target', 'in', ['all', 'parent'])]);
+        notices = notifs.length;
+      } catch (e) {}
+
+      const childName = studentData?.name || 'Your Child';
+      const attPercent = totalDays ? Math.round((attendance / totalDays) * 100) : 0;
+
+      const content = `
+        ${Components.pageHeader('Parent Dashboard', `Monitoring ${childName}'s progress`, '')}
+
+        ${!studentData ? `
+          <div class="card mb-6" style="border-left:4px solid var(--warning)">
+            <div class="flex items-center gap-3">
+              <span style="font-size:24px">&#9888;</span>
+              <div>
+                <p style="font-size:var(--font-size-sm);font-weight:var(--font-semibold)">Student Not Linked</p>
+                <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">No student account is linked to your parent profile. Please contact the admin to link your account to your child's record.</p>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#9745;', attPercent + '%', 'Attendance', 'primary', 0)}
+          ${Components.statCard('&#128196;', notices, 'New Notices', 'success', 100)}
+          ${Components.statCard('&#9998;', leaveStatus, 'Leave Status', 'warning', 200)}
+          ${Components.statCard('&#127891;', studentYear, 'Current Year', 'accent', 300)}
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-2">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Attendance Trend</h3>
+            <div style="height:260px;position:relative"><canvas id="attTrend"></canvas></div>
+          </div>
+          <div class="card animate-fade-in-up stagger-3">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">${childName}'s Info</h3>
+            ${studentData ? `
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                <div><p class="form-label" style="margin-bottom:2px">Name</p><p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">${Utils.escapeHtml(studentData.name)}</p></div>
+                <div><p class="form-label" style="margin-bottom:2px">Register No</p><p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">${Utils.escapeHtml(studentData.registerNumber || 'N/A')}</p></div>
+                <div><p class="form-label" style="margin-bottom:2px">Year / Section</p><p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">${studentData.year || 'N/A'} / ${studentData.section || 'N/A'}</p></div>
+                <div><p class="form-label" style="margin-bottom:2px">Department</p><p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">${studentData.department || 'AI & DS'}</p></div>
+                <div><p class="form-label" style="margin-bottom:2px">Gender</p><p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">${studentData.gender || 'N/A'}</p></div>
+                <div><p class="form-label" style="margin-bottom:2px">Blood Group</p><p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">${studentData.bloodGroup || 'N/A'}</p></div>
+              </div>
+            ` : '<p style="color:var(--text-tertiary);font-size:var(--font-size-sm)">No student data available</p>'}
+          </div>
+        </div>
+
+        <div class="card animate-fade-in-up stagger-4">
+          <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Quick Access</h3>
+          <div class="grid grid-3" style="gap:12px">
+            <a href="/dashboard/parent/attendance.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#9745;</span><span>View Attendance</span>
+            </a>
+            <a href="/dashboard/parent/notices.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#128196;</span><span>Department Notices</span>
+            </a>
+            <a href="/dashboard/parent/faculty.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#128222;</span><span>Faculty Contact</span>
+            </a>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+
+      setTimeout(() => {
+        if (studentData) {
+          DB.getAll('attendance', [DB.where('studentId', '==', studentData.id)]).then(records => {
+            const monthlyData = {};
+            records.forEach(r => {
+              const month = new Date(r.date).toLocaleString('default', { month: 'short' });
+              if (!monthlyData[month]) monthlyData[month] = { present: 0, total: 0 };
+              monthlyData[month].total++;
+              if (r.status === 'present') monthlyData[month].present++;
+            });
+            const months = Object.keys(monthlyData);
+            const percents = months.map(m => Math.round((monthlyData[m].present / monthlyData[m].total) * 100));
+            if (months.length) Charts.monthlyAttendanceChart('attTrend', months, percents);
+            else Charts.monthlyAttendanceChart('attTrend', ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], [92, 88, 94, 90, 91, 89]);
+          }).catch(() => {
+            Charts.monthlyAttendanceChart('attTrend', ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], [0, 0, 0, 0, 0, 0]);
+          });
+        } else {
+          Charts.monthlyAttendanceChart('attTrend', ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], [0, 0, 0, 0, 0, 0]);
+        }
+      }, 200);
+    }, 300);
+  </script>
+</body>
+</html>

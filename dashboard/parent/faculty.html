@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty Contact - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let facultyList = [];
+
+    initDashboard('parent', 'faculty');
+    setTimeout(loadFaculty, 400);
+
+    async function loadFaculty() {
+      try { facultyList = await DB.getAll('faculty', [DB.orderBy('name', 'asc')]); }
+      catch (e) { facultyList = []; }
+      renderPage();
+    }
+
+    function renderPage() {
+      const deptGroups = {};
+      facultyList.forEach(f => {
+        const dept = f.department || 'AI & Data Science';
+        if (!deptGroups[dept]) deptGroups[dept] = [];
+        deptGroups[dept].push(f);
+      });
+
+      const content = `
+        ${Components.pageHeader('Faculty Contact List', `${facultyList.length} faculty members`, '')}
+
+        ${facultyList.length ? Object.entries(deptGroups).map(([dept, faculty]) => `
+          <div class="mb-6">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px;color:var(--primary)">${Utils.escapeHtml(dept)}</h3>
+            <div class="grid grid-3" style="gap:16px">
+              ${faculty.map(f => `
+                <div class="card animate-fade-in-up" style="padding:0">
+                  <div style="padding:20px">
+                    <div class="flex items-center gap-3 mb-3">
+                      <div class="avatar avatar-placeholder" style="font-size:14px">${Utils.getInitials(f.name)}</div>
+                      <div>
+                        <div style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(f.name || 'N/A')}</div>
+                        <div style="font-size:var(--font-size-xs);color:var(--text-secondary)">${Utils.escapeHtml(f.designation || 'Faculty')}</div>
+                      </div>
+                    </div>
+                    <div style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:2">
+                      ${f.phone ? `<div class="flex items-center gap-2">&#128222; ${Utils.escapeHtml(f.phone)}</div>` : ''}
+                      ${f.email ? `<div class="flex items-center gap-2">&#128231; ${Utils.escapeHtml(f.email)}</div>` : ''}
+                      ${f.employeeId ? `<div class="flex items-center gap-2">&#128196; ID: ${Utils.escapeHtml(f.employeeId)}</div>` : ''}
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('') : Components.emptyState('&#128222;', 'No Faculty', 'No faculty information available.')}
+      `;
+      loadPageContent(content);
+    }
+  </script>
+</body>
+</html>

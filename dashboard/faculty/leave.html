@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leave Requests - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allLeaves = [];
+    let filteredLeaves = [];
+    let activeStatusFilter = '';
+
+    initDashboard('faculty', 'leave');
+    setTimeout(loadLeaves, 400);
+
+    async function loadLeaves() {
+      try { allLeaves = await DB.getAll('leave_requests', [DB.orderBy('createdAt', 'desc')]); }
+      catch (e) { allLeaves = []; }
+      filteredLeaves = [...allLeaves];
+      renderPage();
+    }
+
+    function renderPage() {
+      const pending = allLeaves.filter(l => l.status === 'pending').length;
+      const approved = allLeaves.filter(l => l.status === 'approved').length;
+      const rejected = allLeaves.filter(l => l.status === 'rejected').length;
+
+      const content = `
+        ${Components.pageHeader('Leave Requests', `${filteredLeaves.length} requests`, '')}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#128196;', allLeaves.length, 'Total Requests', 'primary', 0)}
+          ${Components.statCard('&#9203;', pending, 'Pending', 'warning', 100)}
+          ${Components.statCard('&#10004;', approved, 'Approved', 'success', 200)}
+          ${Components.statCard('&#10006;', rejected, 'Rejected', 'danger', 300)}
+        </div>
+
+        <div class="flex gap-2 mb-6" style="flex-wrap:wrap">
+          <button class="btn btn-sm ${!activeStatusFilter ? 'btn-primary' : 'btn-outline'}" onclick="filterLeaves('')">All</button>
+          <button class="btn btn-sm ${activeStatusFilter === 'pending' ? 'btn-primary' : 'btn-outline'}" onclick="filterLeaves('pending')">Pending</button>
+          <button class="btn btn-sm ${activeStatusFilter === 'approved' ? 'btn-primary' : 'btn-outline'}" onclick="filterLeaves('approved')">Approved</button>
+          <button class="btn btn-sm ${activeStatusFilter === 'rejected' ? 'btn-primary' : 'btn-outline'}" onclick="filterLeaves('rejected')">Rejected</button>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Reg. No</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredLeaves.length ? filteredLeaves.map(l => `
+                  <tr>
+                    <td style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(l.studentName || 'N/A')}</td>
+                    <td><span style="font-family:monospace;font-size:var(--font-size-sm)">${Utils.escapeHtml(l.registerNumber || 'N/A')}</span></td>
+                    <td style="font-size:var(--font-size-sm)">${Utils.formatDate(l.fromDate)}</td>
+                    <td style="font-size:var(--font-size-sm)">${Utils.formatDate(l.toDate)}</td>
+                    <td style="max-width:200px;font-size:var(--font-size-sm)">${Utils.escapeHtml(Utils.truncate(l.reason || '', 60))}</td>
+                    <td>
+                      <span class="badge ${l.status === 'pending' ? 'badge-warning' : l.status === 'approved' ? 'badge-success' : 'badge-danger'}">
+                        ${Utils.capitalize(l.status || 'pending')}
+                      </span>
+                    </td>
+                    <td>
+                      ${l.status === 'pending' ? `
+                        <div class="table-actions">
+                          <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--success)" data-tooltip="Approve" onclick="updateLeave('${l.id}','approved')">&#10004;</button>
+                          <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--danger)" data-tooltip="Reject" onclick="updateLeave('${l.id}','rejected')">&#10006;</button>
+                        </div>
+                      ` : `<span style="font-size:var(--font-size-xs);color:var(--text-secondary)">No action</span>`}
+                    </td>
+                  </tr>
+                `).join('') : `
+                  <tr><td colspan="7">
+                    ${Components.emptyState('&#9998;', 'No Leave Requests', 'No leave requests found.')}
+                  </td></tr>
+                `}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    async function updateLeave(id, status) {
+      try {
+        await DB.update('leave_requests', id, { status, reviewedBy: Auth.getCurrentUser()?.displayName || 'Faculty' });
+        Toast.success('Updated', `Leave ${status}`);
+        loadLeaves();
+      } catch (e) { Toast.error('Error', e.message); }
+    }
+
+    function filterLeaves(status) {
+      activeStatusFilter = status;
+      filteredLeaves = status ? allLeaves.filter(l => l.status === status) : [...allLeaves];
+      renderPage();
+    }
+  </script>
+</body>
+</html>

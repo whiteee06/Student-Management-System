@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/charts.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    initDashboard('admin', 'dashboard');
+
+    setTimeout(async () => {
+      let totalStudents = 0, totalFaculty = 0, totalParents = 0, attendance = 92;
+      try {
+        const [students, faculty, parents] = await Promise.all([
+          DB.getAll('students'),
+          DB.getAll('faculty'),
+          DB.getAll('parents')
+        ]);
+        totalStudents = students.length;
+        totalFaculty = faculty.length;
+        totalParents = parents.length;
+      } catch (e) {}
+
+      const content = `
+        ${Components.pageHeader('Dashboard', 'Welcome back, Admin!', `
+          <a href="/dashboard/admin/students.html" class="btn btn-primary btn-sm">+ Add Student</a>
+          <button class="btn btn-outline btn-sm" onclick="navigateTo('/dashboard/admin/reports.html')">&#128202; Reports</button>
+        `)}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#127891;', totalStudents, 'Total Students', 'primary', 0)}
+          ${Components.statCard('&#128105;', totalFaculty, 'Total Faculty', 'success', 100)}
+          ${Components.statCard('&#128106;', totalParents, 'Total Parents', 'accent', 200)}
+          ${Components.statCard('&#9745;', attendance + '%', 'Attendance Rate', 'warning', 300)}
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-2">
+            <div class="flex items-center justify-between mb-4">
+              <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold)">Attendance Overview</h3>
+              <span class="badge badge-success">Live</span>
+            </div>
+            <div style="height:280px;position:relative">
+              <canvas id="attendanceChart"></canvas>
+            </div>
+          </div>
+          <div class="card animate-fade-in-up stagger-3">
+            <div class="flex items-center justify-between mb-4">
+              <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold)">Students by Year</h3>
+            </div>
+            <div style="height:280px;position:relative">
+              <canvas id="yearChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-4">
+            <div class="flex items-center justify-between mb-4">
+              <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold)">Gender Distribution</h3>
+            </div>
+            <div style="height:240px;position:relative">
+              <canvas id="genderChart"></canvas>
+            </div>
+          </div>
+          <div class="card animate-fade-in-up stagger-5">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Recent Activity</h3>
+            <div id="recentActivity">
+              <div class="flex gap-3 mb-4" style="align-items:flex-start">
+                <div style="width:36px;height:36px;border-radius:50%;background:rgba(34,197,94,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px">&#10004;</div>
+                <div>
+                  <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">New student registered</p>
+                  <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">2 minutes ago</p>
+                </div>
+              </div>
+              <div class="flex gap-3 mb-4" style="align-items:flex-start">
+                <div style="width:36px;height:36px;border-radius:50%;background:rgba(37,99,235,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px">&#128221;</div>
+                <div>
+                  <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">Assignment uploaded by faculty</p>
+                  <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">15 minutes ago</p>
+                </div>
+              </div>
+              <div class="flex gap-3 mb-4" style="align-items:flex-start">
+                <div style="width:36px;height:36px;border-radius:50%;background:rgba(245,158,11,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px">&#128196;</div>
+                <div>
+                  <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">New notice published</p>
+                  <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">1 hour ago</p>
+                </div>
+              </div>
+              <div class="flex gap-3" style="align-items:flex-start">
+                <div style="width:36px;height:36px;border-radius:50%;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px">&#128197;</div>
+                <div>
+                  <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">Leave request pending</p>
+                  <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">3 hours ago</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card animate-fade-in-up stagger-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold)">Quick Actions</h3>
+          </div>
+          <div class="grid grid-4" style="gap:12px">
+            <a href="/dashboard/admin/students.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#128100;</span>
+              <span>Manage Students</span>
+            </a>
+            <a href="/dashboard/admin/faculty.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#128105;</span>
+              <span>Manage Faculty</span>
+            </a>
+            <a href="/dashboard/admin/attendance.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#9745;</span>
+              <span>Attendance</span>
+            </a>
+            <a href="/dashboard/admin/reports.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#128202;</span>
+              <span>Reports</span>
+            </a>
+          </div>
+        </div>
+      `;
+
+      loadPageContent(content);
+
+      setTimeout(() => {
+        Charts.attendanceChart('attendanceChart', 85, 10, 5);
+        Charts.barChart && Charts.create('yearChart', {
+          type: 'bar',
+          data: {
+            labels: ['I Year', 'II Year', 'III Year', 'IV Year'],
+            datasets: [{
+              label: 'Students',
+              data: [48, 45, 42, 45],
+              backgroundColor: ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B'],
+              borderRadius: 8,
+              borderSkipped: false
+            }]
+          },
+          options: { ...Charts.getDefaults(), plugins: { legend: { display: false } } }
+        });
+        Charts.genderDistributionChart('genderChart', 95, 85);
+      }, 100);
+    }, 300);
+
+    function navigateTo(url) { window.location.href = url; }
+  </script>
+</body>
+</html>

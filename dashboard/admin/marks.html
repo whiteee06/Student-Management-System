@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Marks Management - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allMarks = [];
+    let filteredMarks = [];
+    let allStudents = [];
+    let currentPage = 1;
+    const perPage = 10;
+
+    initDashboard('admin', 'marks');
+    setTimeout(loadAll, 400);
+
+    async function loadAll() {
+      try {
+        [allMarks, allStudents] = await Promise.all([
+          DB.getAll('marks', [DB.orderBy('studentName', 'asc')]),
+          DB.getAll('students', [DB.orderBy('name', 'asc')])
+        ]);
+      } catch (e) { allMarks = []; allStudents = []; }
+      filteredMarks = [...allMarks];
+      renderPage();
+    }
+
+    function getGrade(total) {
+      if (total >= 90) return 'A+';
+      if (total >= 80) return 'A';
+      if (total >= 70) return 'B+';
+      if (total >= 60) return 'B';
+      if (total >= 50) return 'C';
+      if (total >= 40) return 'D';
+      return 'F';
+    }
+
+    function getGradeColor(grade) {
+      if (grade === 'A+' || grade === 'A') return 'badge-success';
+      if (grade === 'B+' || grade === 'B') return 'badge-primary';
+      if (grade === 'C') return 'badge-warning';
+      return 'badge-danger';
+    }
+
+    function renderPage() {
+      const start = (currentPage - 1) * perPage;
+      const pageData = filteredMarks.slice(start, start + perPage);
+
+      const content = `
+        ${Components.pageHeader('Marks Management', `${filteredMarks.length} records`, `
+          <button class="btn btn-primary btn-sm" onclick="showAddMarks()">+ Add Marks</button>
+          <button class="btn btn-outline btn-sm" onclick="exportTableToCSV('marksTable','marks')">&#128194; Export</button>
+        `)}
+
+        ${Components.searchFilterBar([
+          { id: 'year', label: 'Year', options: [{value:'1',label:'I Year'},{value:'2',label:'II Year'},{value:'3',label:'III Year'},{value:'4',label:'IV Year'}] },
+          { id: 'semester', label: 'Semester', options: [{value:'1',label:'Sem 1'},{value:'2',label:'Sem 2'},{value:'3',label:'Sem 3'},{value:'4',label:'Sem 4'},{value:'5',label:'Sem 5'},{value:'6',label:'Sem 6'},{value:'7',label:'Sem 7'},{value:'8',label:'Sem 8'}] }
+        ])}
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none">
+            <table class="table" id="marksTable">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Reg. No</th>
+                  <th>Subject</th>
+                  <th>Unit 1</th>
+                  <th>Unit 2</th>
+                  <th>Unit 3</th>
+                  <th>Total</th>
+                  <th>Grade</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pageData.length ? pageData.map(m => {
+                  const total = (parseInt(m.unit1) || 0) + (parseInt(m.unit2) || 0) + (parseInt(m.unit3) || 0);
+                  const grade = getGrade(total);
+                  return `
+                    <tr>
+                      <td>
+                        <div class="flex items-center gap-3">
+                          <div class="avatar avatar-placeholder" style="font-size:12px">${Utils.getInitials(m.studentName)}</div>
+                          <div style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(m.studentName || 'N/A')}</div>
+                        </div>
+                      </td>
+                      <td><span style="font-family:monospace;font-size:var(--font-size-sm)">${Utils.escapeHtml(m.registerNumber || 'N/A')}</span></td>
+                      <td style="font-size:var(--font-size-sm)">${Utils.escapeHtml(m.subject || 'N/A')}</td>
+                      <td><span style="font-size:var(--font-size-sm)">${m.unit1 || '-'}</span></td>
+                      <td><span style="font-size:var(--font-size-sm)">${m.unit2 || '-'}</span></td>
+                      <td><span style="font-size:var(--font-size-sm)">${m.unit3 || '-'}</span></td>
+                      <td style="font-weight:var(--font-semibold)">${total}</td>
+                      <td><span class="badge ${getGradeColor(grade)}">${grade}</span></td>
+                      <td>
+                        <div class="table-actions">
+                          <button class="btn btn-ghost btn-sm btn-icon" onclick="editMarks('${m.id}')">&#9998;</button>
+                          <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--danger)" onclick="deleteMarks('${m.id}','${Utils.escapeHtml(m.studentName)}')">&#128465;</button>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('') : `<tr><td colspan="9">${Components.emptyState('&#128202;', 'No Marks', 'No marks records found.')}</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        ${Components.pagination(filteredMarks.length, perPage, currentPage, 'goToPage')}
+
+        <div class="modal-overlay" id="marksModal">
+          <div class="modal">
+            <div class="modal-header">
+              <h3 class="modal-title" id="marksModalTitle">Add Marks</h3>
+              <button class="modal-close" onclick="Utils.hideModal('marksModal')">&#10005;</button>
+            </div>
+            <div class="modal-body">
+              <form id="marksForm" onsubmit="saveMarks(event)">
+                <input type="hidden" id="editMarksId">
+                <div class="grid grid-2" style="gap:12px">
+                  <div class="form-group"><label class="form-label">Student <span class="required">*</span></label>
+                    <select class="form-input form-select" id="mkStudent" required>
+                      <option value="">Select Student</option>
+                      ${allStudents.map(s => `<option value="${s.id}" data-name="${Utils.escapeHtml(s.name)}" data-reg="${Utils.escapeHtml(s.registerNumber)}" data-year="${s.year || ''}" data-sem="${s.semester || ''}">${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.registerNumber || '')})</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="form-group"><label class="form-label">Subject <span class="required">*</span></label><input type="text" class="form-input" id="mkSubject" required placeholder="e.g. Data Structures"></div>
+                </div>
+                <div class="grid grid-3" style="gap:12px">
+                  <div class="form-group"><label class="form-label">Unit 1 (out of 30)</label><input type="number" class="form-input" id="mkUnit1" min="0" max="30" placeholder="0"></div>
+                  <div class="form-group"><label class="form-label">Unit 2 (out of 30)</label><input type="number" class="form-input" id="mkUnit2" min="0" max="30" placeholder="0"></div>
+                  <div class="form-group"><label class="form-label">Unit 3 (out of 40)</label><input type="number" class="form-input" id="mkUnit3" min="0" max="40" placeholder="0"></div>
+                </div>
+                <div class="grid grid-2" style="gap:12px">
+                  <div class="form-group"><label class="form-label">Year</label>
+                    <select class="form-input form-select" id="mkYear">
+                      <option value="">Select</option>
+                      <option value="1">I Year</option><option value="2">II Year</option><option value="3">III Year</option><option value="4">IV Year</option>
+                    </select>
+                  </div>
+                  <div class="form-group"><label class="form-label">Semester</label>
+                    <select class="form-input form-select" id="mkSem">
+                      <option value="">Select</option>
+                      <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+                      <option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group"><label class="form-label">Remarks</label><textarea class="form-input form-textarea" id="mkRemarks" rows="2" placeholder="Optional remarks"></textarea></div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" onclick="Utils.hideModal('marksModal')">Cancel</button>
+              <button class="btn btn-primary" onclick="document.getElementById('marksForm').requestSubmit()">Save</button>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function showAddMarks() {
+      document.getElementById('marksModalTitle').textContent = 'Add Marks';
+      document.getElementById('editMarksId').value = '';
+      document.getElementById('marksForm').reset();
+      Utils.showModal('marksModal');
+    }
+
+    function editMarks(id) {
+      const m = allMarks.find(x => x.id === id);
+      if (!m) return;
+      document.getElementById('marksModalTitle').textContent = 'Edit Marks';
+      document.getElementById('editMarksId').value = id;
+      const sel = document.getElementById('mkStudent');
+      const opt = Array.from(sel.options).find(o => o.dataset.name === m.studentName);
+      if (opt) sel.value = opt.value;
+      document.getElementById('mkSubject').value = m.subject || '';
+      document.getElementById('mkUnit1').value = m.unit1 || '';
+      document.getElementById('mkUnit2').value = m.unit2 || '';
+      document.getElementById('mkUnit3').value = m.unit3 || '';
+      document.getElementById('mkYear').value = m.year || '';
+      document.getElementById('mkSem').value = m.semester || '';
+      document.getElementById('mkRemarks').value = m.remarks || '';
+      Utils.showModal('marksModal');
+    }
+
+    async function saveMarks(e) {
+      e.preventDefault();
+      const id = document.getElementById('editMarksId').value;
+      const studentSelect = document.getElementById('mkStudent');
+      const selectedOpt = studentSelect.options[studentSelect.selectedIndex];
+      const data = {
+        studentId: studentSelect.value,
+        studentName: selectedOpt?.dataset?.name || '',
+        registerNumber: selectedOpt?.dataset?.reg || '',
+        subject: Utils.sanitize(document.getElementById('mkSubject').value),
+        unit1: parseInt(document.getElementById('mkUnit1').value) || 0,
+        unit2: parseInt(document.getElementById('mkUnit2').value) || 0,
+        unit3: parseInt(document.getElementById('mkUnit3').value) || 0,
+        year: document.getElementById('mkYear').value,
+        semester: document.getElementById('mkSem').value,
+        remarks: Utils.sanitize(document.getElementById('mkRemarks').value)
+      };
+      if (!data.studentId || !data.subject) { Toast.warning('Required', 'Student and Subject are required'); return; }
+      if (data.unit1 > 30 || data.unit2 > 30 || data.unit3 > 40) { Toast.warning('Invalid', 'Marks exceed maximum'); return; }
+      try {
+        if (id) { await DB.update('marks', id, data); Toast.success('Updated', 'Marks updated'); }
+        else { await DB.add('marks', data); Toast.success('Added', 'Marks added'); }
+        Utils.hideModal('marksModal');
+        loadAll();
+      } catch (err) { Toast.error('Error', err.message); }
+    }
+
+    async function deleteMarks(id, name) {
+      confirmDelete(`Delete marks for "${name}"?`, async () => {
+        try { await DB.remove('marks', id); Toast.success('Deleted', 'Marks removed'); loadAll(); }
+        catch (e) { Toast.error('Error', e.message); }
+      });
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      renderPage();
+    }
+
+    window._filterCallback = () => {
+      const q = document.getElementById('searchInput')?.value.toLowerCase() || '';
+      const year = document.getElementById('filter_year')?.value || '';
+      const sem = document.getElementById('filter_semester')?.value || '';
+      filteredMarks = allMarks.filter(m => {
+        if (q && !(m.studentName || '').toLowerCase().includes(q) && !(m.registerNumber || '').toLowerCase().includes(q) && !(m.subject || '').toLowerCase().includes(q)) return false;
+        if (year && m.year !== year) return false;
+        if (sem && m.semester !== sem) return false;
+        return true;
+      });
+      currentPage = 1;
+      renderPage();
+    };
+  </script>
+</body>
+</html>

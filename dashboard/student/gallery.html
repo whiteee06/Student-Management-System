@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gallery - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+  <style>
+    .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px}
+    .gallery-item{border-radius:var(--radius-lg);overflow:hidden;background:var(--bg-secondary);transition:transform 0.2s,box-shadow 0.2s;cursor:pointer}
+    .gallery-item:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+    .gallery-item-img{width:100%;height:200px;object-fit:cover;background:var(--gradient-primary);display:flex;align-items:center;justify-content:center;font-size:48px;color:white}
+    .gallery-item-info{padding:16px}
+    .gallery-item-title{font-weight:var(--font-semibold);font-size:var(--font-size-sm);margin-bottom:4px}
+    .gallery-item-meta{font-size:var(--font-size-xs);color:var(--text-secondary)}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allImages = [];
+    let filteredImages = [];
+    let activeCategory = '';
+    const categories = ['Events', 'Symposium', 'Workshop', 'Placement', 'Culturals', 'Sports'];
+
+    initDashboard('student', 'gallery');
+    setTimeout(loadGallery, 400);
+
+    async function loadGallery() {
+      try { allImages = await DB.getAll('gallery', [DB.orderBy('createdAt', 'desc')]); }
+      catch (e) { allImages = []; }
+      filteredImages = [...allImages];
+      renderPage();
+    }
+
+    function getCategoryGradient(cat) {
+      const gradients = {
+        'Events': 'var(--gradient-primary)', 'Symposium': 'var(--gradient-accent)',
+        'Workshop': 'var(--gradient-success)', 'Placement': 'var(--gradient-purple)',
+        'Culturals': 'var(--gradient-warning)', 'Sports': 'linear-gradient(135deg, #EF4444, #F59E0B)'
+      };
+      return gradients[cat] || 'var(--gradient-primary)';
+    }
+
+    function renderPage() {
+      const content = `
+        ${Components.pageHeader('Photo Gallery', `${filteredImages.length} photos`, '')}
+
+        <div class="flex gap-2 mb-6" style="flex-wrap:wrap">
+          <button class="btn btn-sm ${!activeCategory ? 'btn-primary' : 'btn-outline'}" onclick="filterGallery('')">All</button>
+          ${categories.map(c => `<button class="btn btn-sm ${activeCategory === c ? 'btn-primary' : 'btn-outline'}" onclick="filterGallery('${c}')">${c}</button>`).join('')}
+        </div>
+
+        <div class="gallery-grid">
+          ${filteredImages.length ? filteredImages.map(img => `
+            <div class="gallery-item animate-fade-in-up">
+              ${img.url ? `<img src="${Utils.escapeHtml(img.url)}" alt="${Utils.escapeHtml(img.title || '')}" style="width:100%;height:200px;object-fit:cover" onerror="this.outerHTML='<div class=\\'gallery-item-img\\' style=\\'background:${getCategoryGradient(img.category)}\\'>&#128248;</div>'">` : `<div class="gallery-item-img" style="background:${getCategoryGradient(img.category)}">&#128248;</div>`}
+              <div class="gallery-item-info">
+                <div class="gallery-item-title">${Utils.escapeHtml(img.title || 'Untitled')}</div>
+                <div class="gallery-item-meta flex items-center gap-2">
+                  <span class="badge badge-primary" style="font-size:10px">${Utils.escapeHtml(img.category || 'General')}</span>
+                  <span>${Utils.formatDate(img.date) || 'N/A'}</span>
+                </div>
+                ${img.description ? `<p style="font-size:var(--font-size-xs);color:var(--text-secondary);margin-top:8px">${Utils.escapeHtml(Utils.truncate(img.description, 80))}</p>` : ''}
+              </div>
+            </div>
+          `).join('') : `<div style="grid-column:1/-1">${Components.emptyState('&#128248;', 'No Photos', 'No gallery photos available yet.')}</div>`}
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function filterGallery(cat) {
+      activeCategory = cat;
+      filteredImages = cat ? allImages.filter(i => i.category === cat) : [...allImages];
+      renderPage();
+    }
+  </script>
+</body>
+</html>

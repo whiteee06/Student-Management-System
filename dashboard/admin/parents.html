@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Parents - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allParents = [];
+    let filteredParents = [];
+    let currentPage = 1;
+    const perPage = 10;
+
+    initDashboard('admin', 'parents');
+    setTimeout(loadParents, 400);
+
+    async function loadParents() {
+      try { allParents = await DB.getAll('parents', [DB.orderBy('name', 'asc')]); }
+      catch (e) { allParents = []; }
+      filteredParents = [...allParents];
+      renderParents();
+    }
+
+    function renderParents() {
+      const start = (currentPage - 1) * perPage;
+      const pageData = filteredParents.slice(start, start + perPage);
+
+      const content = `
+        ${Components.pageHeader('Manage Parents', `${filteredParents.length} parents registered`, `
+          <button class="btn btn-primary btn-sm" onclick="showAddParent()">+ Add Parent</button>
+          <button class="btn btn-outline btn-sm" onclick="exportTableToCSV('parentsTable','parents')">&#128194; Export</button>
+        `)}
+
+        ${Components.searchFilterBar([
+          { id: 'relation', label: 'Relation', options: [{value:'Father',label:'Father'},{value:'Mother',label:'Mother'},{value:'Guardian',label:'Guardian'}] }
+        ])}
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none">
+            <table class="table" id="parentsTable">
+              <thead>
+                <tr>
+                  <th>Parent</th>
+                  <th>Parent ID</th>
+                  <th>Relation</th>
+                  <th>Phone</th>
+                  <th>Email</th>
+                  <th>Children</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pageData.length ? pageData.map(p => `
+                  <tr>
+                    <td>
+                      <div class="flex items-center gap-3">
+                        <div class="avatar avatar-placeholder" style="font-size:12px;background:var(--gradient-success)">${Utils.getInitials(p.name)}</div>
+                        <div>
+                          <div style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(p.name || 'N/A')}</div>
+                          <div style="font-size:var(--font-size-xs);color:var(--text-secondary)">${Utils.escapeHtml(p.email || '')}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span style="font-family:monospace;font-size:var(--font-size-sm)">${Utils.escapeHtml(p.parentId || 'N/A')}</span></td>
+                    <td><span class="badge badge-primary">${p.relation || 'N/A'}</span></td>
+                    <td>${p.phone || 'N/A'}</td>
+                    <td>${Utils.escapeHtml(p.email || 'N/A')}</td>
+                    <td style="max-width:180px">${Utils.truncate(p.children || 'N/A', 30)}</td>
+                    <td>
+                      <div class="table-actions">
+                        <button class="btn btn-ghost btn-sm btn-icon" onclick="editParent('${p.id}')">&#9998;</button>
+                        <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--danger)" onclick="deleteParent('${p.id}','${Utils.escapeHtml(p.name)}')">&#128465;</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('') : `<tr><td colspan="7">${Components.emptyState('&#128106;', 'No Parents', 'No parents registered yet.')}</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        ${Components.pagination(filteredParents.length, perPage, currentPage, 'goToPage')}
+
+        <div class="modal-overlay" id="parentModal">
+          <div class="modal">
+            <div class="modal-header">
+              <h3 class="modal-title" id="parentModalTitle">Add Parent</h3>
+              <button class="modal-close" onclick="Utils.hideModal('parentModal')">&#10005;</button>
+            </div>
+            <div class="modal-body">
+              <form id="parentForm" onsubmit="saveParent(event)">
+                <input type="hidden" id="editParentId">
+                <div class="form-group"><label class="form-label">Name <span class="required">*</span></label><input type="text" class="form-input" id="parName" required placeholder="Full name"></div>
+                <div class="form-group"><label class="form-label">Parent ID <span class="required">*</span></label><input type="text" class="form-input" id="parId" required placeholder="e.g. PAR001"></div>
+                <div class="grid grid-2" style="gap:12px">
+                  <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="parEmail"></div>
+                  <div class="form-group"><label class="form-label">Phone <span class="required">*</span></label><input type="tel" class="form-input" id="parPhone" required placeholder="10-digit phone"></div>
+                </div>
+                <div class="form-group"><label class="form-label">Relation</label>
+                  <select class="form-input form-select" id="parRelation">
+                    <option value="">Select</option>
+                    <option>Father</option><option>Mother</option><option>Guardian</option>
+                  </select>
+                </div>
+                <div class="form-group"><label class="form-label">Occupation</label><input type="text" class="form-input" id="parOccupation"></div>
+                <div class="form-group"><label class="form-label">Children (Reg. Numbers)</label><textarea class="form-input form-textarea" id="parChildren" rows="2" placeholder="Comma-separated register numbers"></textarea></div>
+                <div class="form-group"><label class="form-label">Address</label><textarea class="form-input form-textarea" id="parAddress" rows="2" placeholder="Full address"></textarea></div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" onclick="Utils.hideModal('parentModal')">Cancel</button>
+              <button class="btn btn-primary" onclick="document.getElementById('parentForm').requestSubmit()">Save</button>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function showAddParent() {
+      document.getElementById('parentModalTitle').textContent = 'Add Parent';
+      document.getElementById('editParentId').value = '';
+      document.getElementById('parentForm').reset();
+      Utils.showModal('parentModal');
+    }
+
+    function editParent(id) {
+      const p = allParents.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('parentModalTitle').textContent = 'Edit Parent';
+      document.getElementById('editParentId').value = id;
+      document.getElementById('parName').value = p.name || '';
+      document.getElementById('parId').value = p.parentId || '';
+      document.getElementById('parEmail').value = p.email || '';
+      document.getElementById('parPhone').value = p.phone || '';
+      document.getElementById('parRelation').value = p.relation || '';
+      document.getElementById('parOccupation').value = p.occupation || '';
+      document.getElementById('parChildren').value = p.children || '';
+      document.getElementById('parAddress').value = p.address || '';
+      Utils.showModal('parentModal');
+    }
+
+    async function saveParent(e) {
+      e.preventDefault();
+      const id = document.getElementById('editParentId').value;
+      const data = {
+        name: Utils.sanitize(document.getElementById('parName').value),
+        parentId: document.getElementById('parId').value.trim(),
+        email: Utils.sanitize(document.getElementById('parEmail').value),
+        phone: document.getElementById('parPhone').value.trim(),
+        relation: document.getElementById('parRelation').value,
+        occupation: Utils.sanitize(document.getElementById('parOccupation').value),
+        children: document.getElementById('parChildren').value.trim(),
+        address: Utils.sanitize(document.getElementById('parAddress').value),
+        status: 'active'
+      };
+      if (!data.name || !data.parentId) { Toast.warning('Required', 'Name and Parent ID are required'); return; }
+      try {
+        if (id) { await DB.update('parents', id, data); Toast.success('Updated', 'Parent updated'); }
+        else { await DB.add('parents', data); Toast.success('Added', 'Parent added'); }
+        Utils.hideModal('parentModal');
+        loadParents();
+      } catch (err) { Toast.error('Error', err.message); }
+    }
+
+    async function deleteParent(id, name) {
+      confirmDelete(`Delete parent "${name}"?`, async () => {
+        try { await DB.remove('parents', id); Toast.success('Deleted', 'Parent removed'); loadParents(); }
+        catch (e) { Toast.error('Error', e.message); }
+      });
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      renderParents();
+    }
+
+    window._filterCallback = () => {
+      const q = document.getElementById('searchInput')?.value.toLowerCase() || '';
+      const rel = document.getElementById('filter_relation')?.value || '';
+      filteredParents = allParents.filter(p => {
+        if (q && !(p.name || '').toLowerCase().includes(q) && !(p.parentId || '').toLowerCase().includes(q) && !(p.email || '').toLowerCase().includes(q)) return false;
+        if (rel && p.relation !== rel) return false;
+        return true;
+      });
+      currentPage = 1;
+      renderParents();
+    };
+  </script>
+</body>
+</html>

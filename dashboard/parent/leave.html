@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leave Status - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let childData = null;
+    let leaves = [];
+
+    initDashboard('parent', 'leave');
+    setTimeout(loadData, 400);
+
+    async function loadData() {
+      const user = Auth.getCurrentUser();
+      if (!user) return;
+      try {
+        const userDoc = await DB.get('users', user.uid);
+        const linkedStudentId = userDoc?.linkedStudentId;
+
+        if (linkedStudentId) {
+          childData = await DB.get('students', linkedStudentId);
+        }
+
+        if (!childData) {
+          const parents = await DB.getAll('parents', [DB.where('uid', '==', user.uid)]);
+          if (parents.length && parents[0].linkedStudentId) {
+            childData = await DB.get('students', parents[0].linkedStudentId);
+          }
+        }
+
+        if (!childData) {
+          const parentData = (await DB.getAll('parents', [DB.where('uid', '==', user.uid)]))[0] || {};
+          if (parentData.phone) {
+            const students = await DB.getAll('students', [DB.where('parentPhone', '==', parentData.phone)]);
+            childData = students[0] || null;
+          }
+        }
+
+        if (childData) {
+          leaves = await DB.getAll('leave_requests', [DB.where('studentUid', '==', childData.uid || ''), DB.orderBy('createdAt', 'desc')]);
+          if (!leaves.length) {
+            leaves = await DB.getAll('leave_requests', [DB.where('studentId', '==', childData.id || ''), DB.orderBy('createdAt', 'desc')]);
+          }
+          if (!leaves.length && childData.registerNumber) {
+            leaves = await DB.getAll('leave_requests', [DB.where('registerNumber', '==', childData.registerNumber), DB.orderBy('createdAt', 'desc')]);
+          }
+        }
+      } catch (e) { leaves = []; }
+      renderPage();
+    }
+
+    function renderPage() {
+      const pending = leaves.filter(l => l.status === 'pending').length;
+      const approved = leaves.filter(l => l.status === 'approved').length;
+      const rejected = leaves.filter(l => l.status === 'rejected').length;
+
+      const content = `
+        ${Components.pageHeader(`Leave Status - ${childData ? Utils.escapeHtml(childData.name) : 'Child'}`, `${leaves.length} leave requests`, '')}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#128196;', leaves.length, 'Total Requests', 'primary', 0)}
+          ${Components.statCard('&#9203;', pending, 'Pending', 'warning', 100)}
+          ${Components.statCard('&#10004;', approved, 'Approved', 'success', 200)}
+          ${Components.statCard('&#10006;', rejected, 'Rejected', 'danger', 300)}
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Reviewed By</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${leaves.length ? leaves.map(l => `
+                  <tr>
+                    <td style="font-size:var(--font-size-sm)">${Utils.formatDate(l.fromDate)}</td>
+                    <td style="font-size:var(--font-size-sm)">${Utils.formatDate(l.toDate)}</td>
+                    <td style="max-width:250px;font-size:var(--font-size-sm)">${Utils.escapeHtml(Utils.truncate(l.reason || '', 80))}</td>
+                    <td>
+                      <span class="badge ${l.status === 'pending' ? 'badge-warning' : l.status === 'approved' ? 'badge-success' : 'badge-danger'}">
+                        ${Utils.capitalize(l.status || 'pending')}
+                      </span>
+                    </td>
+                    <td style="font-size:var(--font-size-xs);color:var(--text-secondary)">${Utils.escapeHtml(l.reviewedBy || 'Pending review')}</td>
+                  </tr>
+                `).join('') : `<tr><td colspan="5">${Components.emptyState('&#9998;', 'No Leave Requests', 'No leave requests found for your child.')}</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+  </script>
+</body>
+</html>

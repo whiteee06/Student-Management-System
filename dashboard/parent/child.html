@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Child - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let childData = null;
+
+    initDashboard('parent', 'child');
+    setTimeout(loadChild, 400);
+
+    async function loadChild() {
+      const user = Auth.getCurrentUser();
+      if (!user) return;
+      try {
+        const userDoc = await DB.get('users', user.uid);
+        const linkedStudentId = userDoc?.linkedStudentId;
+
+        if (linkedStudentId) {
+          childData = await DB.get('students', linkedStudentId);
+        }
+
+        if (!childData) {
+          const parents = await DB.getAll('parents', [DB.where('uid', '==', user.uid)]);
+          if (parents.length && parents[0].linkedStudentId) {
+            childData = await DB.get('students', parents[0].linkedStudentId);
+          }
+        }
+
+        if (!childData) {
+          const parentData = (await DB.getAll('parents', [DB.where('uid', '==', user.uid)]))[0] || {};
+          if (parentData.phone) {
+            const students = await DB.getAll('students', [DB.where('parentPhone', '==', parentData.phone)]);
+            childData = students[0] || null;
+          }
+        }
+      } catch (e) { childData = null; }
+      renderPage();
+    }
+
+    function renderPage() {
+      if (!childData) {
+        loadPageContent(Components.emptyState('&#128100;', 'No Child Found', 'No child profile linked to your account. Please contact administration.'));
+        return;
+      }
+
+      const content = `
+        ${Components.pageHeader("Child's Profile", 'Basic academic and personal information', '')}
+
+        <div class="grid grid-2" style="gap:24px">
+          <div class="card animate-fade-in-up">
+            <div class="flex items-center gap-4 mb-5">
+              <div class="avatar avatar-xl avatar-placeholder" style="font-size:28px">${Utils.getInitials(childData.name)}</div>
+              <div>
+                <h2 style="font-size:var(--font-size-xl);font-weight:var(--font-bold)">${Utils.escapeHtml(childData.name || 'N/A')}</h2>
+                <p style="color:var(--text-secondary);font-size:var(--font-size-sm)">${Utils.escapeHtml(childData.registerNumber || '')}</p>
+                <span class="badge badge-success" style="margin-top:4px">${Utils.capitalize(childData.status || 'active')}</span>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div><p class="form-label">Department</p><p style="font-size:var(--font-size-sm)">${childData.department || 'AI & Data Science'}</p></div>
+              <div><p class="form-label">Year / Semester</p><p style="font-size:var(--font-size-sm)">${childData.year || '-'} / ${childData.semester || '-'}</p></div>
+              <div><p class="form-label">Section</p><p style="font-size:var(--font-size-sm)">${childData.section || 'N/A'}</p></div>
+              <div><p class="form-label">Gender</p><p style="font-size:var(--font-size-sm)">${childData.gender || 'N/A'}</p></div>
+              <div><p class="form-label">Date of Birth</p><p style="font-size:var(--font-size-sm)">${Utils.formatDate(childData.dob) || 'N/A'}</p></div>
+              <div><p class="form-label">Blood Group</p><p style="font-size:var(--font-size-sm)">${childData.bloodGroup || 'N/A'}</p></div>
+              <div><p class="form-label">Phone</p><p style="font-size:var(--font-size-sm)">${childData.phone || 'N/A'}</p></div>
+              <div><p class="form-label">Email</p><p style="font-size:var(--font-size-sm)">${childData.email || 'N/A'}</p></div>
+            </div>
+            ${childData.address ? `<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)"><p class="form-label">Address</p><p style="font-size:var(--font-size-sm)">${Utils.escapeHtml(childData.address)}</p></div>` : ''}
+          </div>
+
+          <div class="card animate-fade-in-up stagger-1">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Quick Links</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <a href="/dashboard/parent/attendance.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+                <span style="font-size:24px">&#9745;</span><span>Attendance</span>
+              </a>
+              <a href="/dashboard/parent/leave.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+                <span style="font-size:24px">&#9998;</span><span>Leave Status</span>
+              </a>
+              <a href="/dashboard/parent/notices.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+                <span style="font-size:24px">&#128196;</span><span>Notices</span>
+              </a>
+              <a href="/dashboard/parent/faculty.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+                <span style="font-size:24px">&#128222;</span><span>Faculty Contact</span>
+              </a>
+            </div>
+
+            <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
+              <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:12px">Parent Information</h3>
+              <div style="font-size:var(--font-size-sm);color:var(--text-secondary)">
+                <p style="margin-bottom:8px"><strong>Parent Name:</strong> ${childData.parentName || 'N/A'}</p>
+                <p><strong>Parent Phone:</strong> ${childData.parentPhone || 'N/A'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+  </script>
+</body>
+</html>

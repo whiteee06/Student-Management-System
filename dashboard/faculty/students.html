@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Students - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allStudents = [];
+    let filteredStudents = [];
+    let currentPage = 1;
+    const perPage = 10;
+
+    initDashboard('faculty', 'students');
+    setTimeout(loadStudents, 400);
+
+    async function loadStudents() {
+      try {
+        allStudents = await DB.getAll('students', [DB.where('status', '==', 'active'), DB.orderBy('name', 'asc')]);
+      } catch (e) { allStudents = []; }
+      filteredStudents = [...allStudents];
+      renderPage();
+    }
+
+    function renderPage() {
+      const start = (currentPage - 1) * perPage;
+      const pageData = filteredStudents.slice(start, start + perPage);
+
+      const content = `
+        ${Components.pageHeader('Students List', `${filteredStudents.length} active students`, `
+          <button class="btn btn-outline btn-sm" onclick="exportTableToCSV('studentsTable','students')">&#128194; Export</button>
+        `)}
+
+        ${Components.searchFilterBar([
+          { id: 'year', label: 'Year', options: [{value:'1',label:'I Year'},{value:'2',label:'II Year'},{value:'3',label:'III Year'},{value:'4',label:'IV Year'}] },
+          { id: 'section', label: 'Section', options: [{value:'A',label:'Section A'},{value:'B',label:'Section B'},{value:'C',label:'Section C'}] },
+          { id: 'gender', label: 'Gender', options: [{value:'Male',label:'Male'},{value:'Female',label:'Female'}] }
+        ])}
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none;border-radius:var(--radius-lg)">
+            <table class="table" id="studentsTable">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Reg. Number</th>
+                  <th>Year / Section</th>
+                  <th>Gender</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pageData.length ? pageData.map(s => `
+                  <tr>
+                    <td>
+                      <div class="flex items-center gap-3">
+                        <div class="avatar avatar-placeholder" style="font-size:12px">${Utils.getInitials(s.name)}</div>
+                        <div>
+                          <div style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(s.name || 'N/A')}</div>
+                          <div style="font-size:var(--font-size-xs);color:var(--text-secondary)">${Utils.escapeHtml(s.email || '')}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span style="font-family:monospace;font-size:var(--font-size-sm)">${Utils.escapeHtml(s.registerNumber || 'N/A')}</span></td>
+                    <td><span class="badge badge-primary">${s.year || '-'} / ${s.section || '-'}</span></td>
+                    <td>${s.gender || 'N/A'}</td>
+                    <td>${s.phone || 'N/A'}</td>
+                    <td>
+                      <span class="badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}">${Utils.capitalize(s.status || 'active')}</span>
+                    </td>
+                    <td>
+                      <div class="table-actions">
+                        <button class="btn btn-ghost btn-sm btn-icon" data-tooltip="View" onclick="viewStudent('${s.id}')">&#128065;</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('') : `
+                  <tr><td colspan="7">
+                    ${Components.emptyState('&#128100;', 'No Students Found', 'No students match your criteria.')}
+                  </td></tr>
+                `}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        ${Components.pagination(filteredStudents.length, perPage, currentPage, 'goToPage')}
+      `;
+      loadPageContent(content);
+    }
+
+    function viewStudent(id) {
+      const s = allStudents.find(x => x.id === id);
+      if (!s) return;
+      const content = `
+        <div class="page-header flex items-center justify-between" style="flex-wrap:wrap;gap:12px">
+          <div>
+            <h1 class="page-title">Student Profile</h1>
+            <p class="page-subtitle">${Utils.escapeHtml(s.name)}</p>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="window.location.reload()">Back to List</button>
+        </div>
+        <div class="card animate-fade-in-up">
+          <div class="flex items-center gap-4 mb-5">
+            <div class="avatar avatar-xl avatar-placeholder" style="font-size:24px">${Utils.getInitials(s.name)}</div>
+            <div>
+              <h2 style="font-size:var(--font-size-xl);font-weight:var(--font-bold)">${Utils.escapeHtml(s.name)}</h2>
+              <p style="color:var(--text-secondary);font-size:var(--font-size-sm)">${Utils.escapeHtml(s.registerNumber || '')}</p>
+              <span class="badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}" style="margin-top:4px">${Utils.capitalize(s.status || 'active')}</span>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div><p class="form-label">Department</p><p style="font-size:var(--font-size-sm)">${s.department || 'N/A'}</p></div>
+            <div><p class="form-label">Year / Semester</p><p style="font-size:var(--font-size-sm)">${s.year || '-'} / ${s.semester || '-'}</p></div>
+            <div><p class="form-label">Section</p><p style="font-size:var(--font-size-sm)">${s.section || 'N/A'}</p></div>
+            <div><p class="form-label">Gender</p><p style="font-size:var(--font-size-sm)">${s.gender || 'N/A'}</p></div>
+            <div><p class="form-label">Date of Birth</p><p style="font-size:var(--font-size-sm)">${Utils.formatDate(s.dob) || 'N/A'}</p></div>
+            <div><p class="form-label">Blood Group</p><p style="font-size:var(--font-size-sm)">${s.bloodGroup || 'N/A'}</p></div>
+            <div><p class="form-label">Phone</p><p style="font-size:var(--font-size-sm)">${s.phone || 'N/A'}</p></div>
+            <div><p class="form-label">Email</p><p style="font-size:var(--font-size-sm)">${s.email || 'N/A'}</p></div>
+            <div><p class="form-label">Parent Name</p><p style="font-size:var(--font-size-sm)">${s.parentName || 'N/A'}</p></div>
+            <div><p class="form-label">Parent Phone</p><p style="font-size:var(--font-size-sm)">${s.parentPhone || 'N/A'}</p></div>
+          </div>
+          ${s.address ? `<div style="margin-top:16px"><p class="form-label">Address</p><p style="font-size:var(--font-size-sm)">${Utils.escapeHtml(s.address)}</p></div>` : ''}
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function goToPage(page) {
+      const totalPages = Math.ceil(filteredStudents.length / perPage);
+      if (page < 1 || page > totalPages) return;
+      currentPage = page;
+      renderPage();
+    }
+
+    window._filterCallback = () => {
+      const q = document.getElementById('searchInput')?.value.toLowerCase() || '';
+      const year = document.getElementById('filter_year')?.value || '';
+      const section = document.getElementById('filter_section')?.value || '';
+      const gender = document.getElementById('filter_gender')?.value || '';
+
+      filteredStudents = allStudents.filter(s => {
+        if (q && !(s.name || '').toLowerCase().includes(q) && !(s.registerNumber || '').toLowerCase().includes(q) && !(s.email || '').toLowerCase().includes(q)) return false;
+        if (year && s.year !== year) return false;
+        if (section && s.section !== section) return false;
+        if (gender && s.gender !== gender) return false;
+        return true;
+      });
+      currentPage = 1;
+      renderPage();
+    };
+  </script>
+</body>
+</html>

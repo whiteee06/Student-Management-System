@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Students - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allStudents = [];
+    let filteredStudents = [];
+    let currentPage = 1;
+    const perPage = 10;
+
+    initDashboard('admin', 'students');
+
+    setTimeout(loadStudents, 400);
+
+    async function loadStudents() {
+      try {
+        allStudents = await DB.getAll('students', [DB.orderBy('name', 'asc')]);
+      } catch (e) {
+        allStudents = [];
+      }
+      filteredStudents = [...allStudents];
+      renderStudents();
+    }
+
+    function renderStudents() {
+      const start = (currentPage - 1) * perPage;
+      const pageData = filteredStudents.slice(start, start + perPage);
+
+      const content = `
+        ${Components.pageHeader('Manage Students', `${filteredStudents.length} students found`, `
+          <button class="btn btn-primary btn-sm" onclick="showAddStudent()">+ Add Student</button>
+          <button class="btn btn-outline btn-sm" onclick="exportTableToCSV('studentsTable','students')">&#128194; Export</button>
+        `)}
+
+        ${Components.searchFilterBar([
+          { id: 'year', label: 'Year', options: [{value:'1',label:'I Year'},{value:'2',label:'II Year'},{value:'3',label:'III Year'},{value:'4',label:'IV Year'}] },
+          { id: 'section', label: 'Section', options: [{value:'A',label:'Section A'},{value:'B',label:'Section B'},{value:'C',label:'Section C'}] },
+          { id: 'gender', label: 'Gender', options: [{value:'Male',label:'Male'},{value:'Female',label:'Female'}] }
+        ])}
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none;border-radius:var(--radius-lg)">
+            <table class="table" id="studentsTable">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Reg. Number</th>
+                  <th>Year / Section</th>
+                  <th>Gender</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pageData.length ? pageData.map(s => `
+                  <tr>
+                    <td>
+                      <div class="flex items-center gap-3">
+                        <div class="avatar avatar-placeholder" style="font-size:12px">${Utils.getInitials(s.name)}</div>
+                        <div>
+                          <div style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(s.name || 'N/A')}</div>
+                          <div style="font-size:var(--font-size-xs);color:var(--text-secondary)">${Utils.escapeHtml(s.email || '')}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span style="font-family:monospace;font-size:var(--font-size-sm)">${Utils.escapeHtml(s.registerNumber || 'N/A')}</span></td>
+                    <td><span class="badge badge-primary">${s.year || '-'} / ${s.section || '-'}</span></td>
+                    <td>${s.gender || 'N/A'}</td>
+                    <td>${s.phone || 'N/A'}</td>
+                    <td>
+                      <span class="badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}">${Utils.capitalize(s.status || 'active')}</span>
+                    </td>
+                    <td>
+                      <div class="table-actions">
+                        <button class="btn btn-ghost btn-sm btn-icon" data-tooltip="View" onclick="viewStudent('${s.id}')">&#128065;</button>
+                        <button class="btn btn-ghost btn-sm btn-icon" data-tooltip="Edit" onclick="editStudent('${s.id}')">&#9998;</button>
+                        <button class="btn btn-ghost btn-sm btn-icon" data-tooltip="Delete" style="color:var(--danger)" onclick="deleteStudent('${s.id}','${Utils.escapeHtml(s.name)}')">&#128465;</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('') : `
+                  <tr><td colspan="7">
+                    ${Components.emptyState('&#128100;', 'No Students Found', 'No students match your criteria.')}
+                  </td></tr>
+                `}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        ${Components.pagination(filteredStudents.length, perPage, currentPage, 'goToPage')}
+
+        <!-- Add/Edit Modal -->
+        <div class="modal-overlay" id="studentModal">
+          <div class="modal modal-lg">
+            <div class="modal-header">
+              <h3 class="modal-title" id="modalTitle">Add Student</h3>
+              <button class="modal-close" onclick="Utils.hideModal('studentModal')">&#10005;</button>
+            </div>
+            <div class="modal-body">
+              <form id="studentForm" onsubmit="saveStudent(event)">
+                <input type="hidden" id="editStudentId">
+                <div class="grid grid-2" style="gap:12px">
+                  <div class="form-group">
+                    <label class="form-label">Student Name <span class="required">*</span></label>
+                    <input type="text" class="form-input" id="studentName" required placeholder="Full name">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Register Number <span class="required">*</span></label>
+                    <input type="text" class="form-input" id="studentRegNo" required placeholder="e.g. 21ADS001">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <select class="form-input form-select" id="studentDept">
+                      <option value="AI&DS">AI & Data Science</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Year <span class="required">*</span></label>
+                    <select class="form-input form-select" id="studentYear" required>
+                      <option value="">Select</option>
+                      <option value="1">I Year</option>
+                      <option value="2">II Year</option>
+                      <option value="3">III Year</option>
+                      <option value="4">IV Year</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Semester</label>
+                    <select class="form-input form-select" id="studentSem">
+                      <option value="">Select</option>
+                      <option value="1">1</option><option value="2">2</option>
+                      <option value="3">3</option><option value="4">4</option>
+                      <option value="5">5</option><option value="6">6</option>
+                      <option value="7">7</option><option value="8">8</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Section</label>
+                    <select class="form-input form-select" id="studentSection">
+                      <option value="">Select</option>
+                      <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Gender</label>
+                    <select class="form-input form-select" id="studentGender">
+                      <option value="">Select</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Date of Birth</label>
+                    <input type="date" class="form-input" id="studentDob">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Blood Group</label>
+                    <select class="form-input form-select" id="studentBlood">
+                      <option value="">Select</option>
+                      <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                      <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Phone</label>
+                    <input type="tel" class="form-input" id="studentPhone" placeholder="10-digit phone">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" id="studentEmail" placeholder="student@email.com">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Parent Name</label>
+                    <input type="text" class="form-input" id="studentParentName">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Parent Phone</label>
+                    <input type="tel" class="form-input" id="studentParentPhone">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Address</label>
+                  <textarea class="form-input form-textarea" id="studentAddress" rows="2" placeholder="Full address"></textarea>
+                </div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" onclick="Utils.hideModal('studentModal')">Cancel</button>
+              <button class="btn btn-primary" onclick="document.getElementById('studentForm').requestSubmit()">Save Student</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      loadPageContent(content);
+    }
+
+    function showAddStudent() {
+      document.getElementById('modalTitle').textContent = 'Add Student';
+      document.getElementById('editStudentId').value = '';
+      document.getElementById('studentForm').reset();
+      Utils.showModal('studentModal');
+    }
+
+    async function editStudent(id) {
+      const student = allStudents.find(s => s.id === id);
+      if (!student) return;
+      document.getElementById('modalTitle').textContent = 'Edit Student';
+      document.getElementById('editStudentId').value = id;
+      document.getElementById('studentName').value = student.name || '';
+      document.getElementById('studentRegNo').value = student.registerNumber || '';
+      document.getElementById('studentDept').value = student.department || 'AI&DS';
+      document.getElementById('studentYear').value = student.year || '';
+      document.getElementById('studentSem').value = student.semester || '';
+      document.getElementById('studentSection').value = student.section || '';
+      document.getElementById('studentGender').value = student.gender || '';
+      document.getElementById('studentDob').value = student.dob || '';
+      document.getElementById('studentBlood').value = student.bloodGroup || '';
+      document.getElementById('studentPhone').value = student.phone || '';
+      document.getElementById('studentEmail').value = student.email || '';
+      document.getElementById('studentParentName').value = student.parentName || '';
+      document.getElementById('studentParentPhone').value = student.parentPhone || '';
+      document.getElementById('studentAddress').value = student.address || '';
+      Utils.showModal('studentModal');
+    }
+
+    async function saveStudent(e) {
+      e.preventDefault();
+      const id = document.getElementById('editStudentId').value;
+      const data = {
+        name: Utils.sanitize(document.getElementById('studentName').value),
+        registerNumber: document.getElementById('studentRegNo').value.trim().toUpperCase(),
+        department: document.getElementById('studentDept').value,
+        year: document.getElementById('studentYear').value,
+        semester: document.getElementById('studentSem').value,
+        section: document.getElementById('studentSection').value,
+        gender: document.getElementById('studentGender').value,
+        dob: document.getElementById('studentDob').value,
+        bloodGroup: document.getElementById('studentBlood').value,
+        phone: document.getElementById('studentPhone').value.trim(),
+        email: Utils.sanitize(document.getElementById('studentEmail').value),
+        parentName: Utils.sanitize(document.getElementById('studentParentName').value),
+        parentPhone: document.getElementById('studentParentPhone').value.trim(),
+        address: Utils.sanitize(document.getElementById('studentAddress').value),
+        status: 'active'
+      };
+
+      if (!data.name || !data.registerNumber) {
+        Toast.warning('Required', 'Name and Register Number are required');
+        return;
+      }
+
+      try {
+        if (id) {
+          await DB.update('students', id, data);
+          Toast.success('Updated', 'Student updated successfully');
+        } else {
+          const dup = await DB.getAll('students', [DB.where('registerNumber', '==', data.registerNumber)]);
+          if (dup.length) {
+            Toast.error('Duplicate', 'Register number already exists');
+            return;
+          }
+          await DB.add('students', data);
+          Toast.success('Added', 'Student added successfully');
+        }
+        Utils.hideModal('studentModal');
+        loadStudents();
+      } catch (err) {
+        Toast.error('Error', err.message);
+      }
+    }
+
+    function viewStudent(id) {
+      const s = allStudents.find(x => x.id === id);
+      if (!s) return;
+      const content = `
+        <div class="page-header flex items-center justify-between" style="flex-wrap:wrap;gap:12px">
+          <div>
+            <h1 class="page-title">Student Profile</h1>
+            <p class="page-subtitle">${Utils.escapeHtml(s.name)}</p>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="window.location.reload()">Back to List</button>
+        </div>
+        <div class="grid grid-2" style="gap:20px">
+          <div class="card">
+            <div class="flex items-center gap-4 mb-5">
+              <div class="avatar avatar-xl avatar-placeholder" style="font-size:24px">${Utils.getInitials(s.name)}</div>
+              <div>
+                <h2 style="font-size:var(--font-size-xl);font-weight:var(--font-bold)">${Utils.escapeHtml(s.name)}</h2>
+                <p style="color:var(--text-secondary);font-size:var(--font-size-sm)">${Utils.escapeHtml(s.registerNumber)}</p>
+                <span class="badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}" style="margin-top:4px">${Utils.capitalize(s.status)}</span>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div><p class="form-label">Department</p><p style="font-size:var(--font-size-sm)">${s.department || 'N/A'}</p></div>
+              <div><p class="form-label">Year / Semester</p><p style="font-size:var(--font-size-sm)">${s.year || '-'} / ${s.semester || '-'}</p></div>
+              <div><p class="form-label">Section</p><p style="font-size:var(--font-size-sm)">${s.section || 'N/A'}</p></div>
+              <div><p class="form-label">Gender</p><p style="font-size:var(--font-size-sm)">${s.gender || 'N/A'}</p></div>
+              <div><p class="form-label">Date of Birth</p><p style="font-size:var(--font-size-sm)">${Utils.formatDate(s.dob) || 'N/A'}</p></div>
+              <div><p class="form-label">Blood Group</p><p style="font-size:var(--font-size-sm)">${s.bloodGroup || 'N/A'}</p></div>
+              <div><p class="form-label">Phone</p><p style="font-size:var(--font-size-sm)">${s.phone || 'N/A'}</p></div>
+              <div><p class="form-label">Email</p><p style="font-size:var(--font-size-sm)">${s.email || 'N/A'}</p></div>
+              <div><p class="form-label">Parent Name</p><p style="font-size:var(--font-size-sm)">${s.parentName || 'N/A'}</p></div>
+              <div><p class="form-label">Parent Phone</p><p style="font-size:var(--font-size-sm)">${s.parentPhone || 'N/A'}</p></div>
+            </div>
+            ${s.address ? `<div style="margin-top:16px"><p class="form-label">Address</p><p style="font-size:var(--font-size-sm)">${Utils.escapeHtml(s.address)}</p></div>` : ''}
+          </div>
+          <div class="card">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Attendance Summary</h3>
+            <div style="height:240px;position:relative"><canvas id="studentAttChart"></canvas></div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function deleteStudent(id, name) {
+      confirmDelete(`Are you sure you want to delete student "${name}"? This action cannot be undone.`, async () => {
+        try {
+          await DB.remove('students', id);
+          Toast.success('Deleted', 'Student removed');
+          loadStudents();
+        } catch (e) {
+          Toast.error('Error', e.message);
+        }
+      });
+    }
+
+    function goToPage(page) {
+      const totalPages = Math.ceil(filteredStudents.length / perPage);
+      if (page < 1 || page > totalPages) return;
+      currentPage = page;
+      renderStudents();
+    }
+
+    window._filterCallback = () => {
+      const q = document.getElementById('searchInput')?.value.toLowerCase() || '';
+      const year = document.getElementById('filter_year')?.value || '';
+      const section = document.getElementById('filter_section')?.value || '';
+      const gender = document.getElementById('filter_gender')?.value || '';
+
+      filteredStudents = allStudents.filter(s => {
+        if (q && !(s.name || '').toLowerCase().includes(q) && !(s.registerNumber || '').toLowerCase().includes(q) && !(s.email || '').toLowerCase().includes(q)) return false;
+        if (year && s.year !== year) return false;
+        if (section && s.section !== section) return false;
+        if (gender && s.gender !== gender) return false;
+        return true;
+      });
+      currentPage = 1;
+      renderStudents();
+    };
+  </script>
+</body>
+</html>

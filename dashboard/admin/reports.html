@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/charts.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    initDashboard('admin', 'reports');
+
+    setTimeout(async () => {
+      let students = [], faculty = [], attendance = [];
+      try {
+        [students, faculty, attendance] = await Promise.all([
+          DB.getAll('students'), DB.getAll('faculty'), DB.getAll('attendance')
+        ]);
+      } catch (e) {}
+
+      const yearCount = { 1: 0, 2: 0, 3: 0, 4: 0 };
+      students.forEach(s => { if (yearCount[s.year] !== undefined) yearCount[s.year]++; });
+      const genderCount = { Male: 0, Female: 0 };
+      students.forEach(s => { if (genderCount[s.gender] !== undefined) genderCount[s.gender]++; });
+
+      const content = `
+        ${Components.pageHeader('Reports & Analytics', 'Department performance overview', `
+          <button class="btn btn-outline btn-sm" onclick="window.print()">&#128424; Print Report</button>
+        `)}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#127891;', students.length, 'Total Students', 'primary', 0)}
+          ${Components.statCard('&#128105;', faculty.length, 'Total Faculty', 'success', 100)}
+          ${Components.statCard('&#9745;', attendance.length, 'Attendance Records', 'accent', 200)}
+          ${Components.statCard('&#128200;', '85%', 'Avg Attendance', 'warning', 300)}
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-2">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Students by Year</h3>
+            <div style="height:280px;position:relative"><canvas id="yearChart"></canvas></div>
+          </div>
+          <div class="card animate-fade-in-up stagger-3">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Gender Distribution</h3>
+            <div style="height:280px;position:relative"><canvas id="genderChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-4">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Attendance by Month</h3>
+            <div style="height:280px;position:relative"><canvas id="monthChart"></canvas></div>
+          </div>
+          <div class="card animate-fade-in-up stagger-5">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Export Reports</h3>
+            <div style="display:flex;flex-direction:column;gap:12px;padding:20px 0">
+              <button class="btn btn-outline btn-full" onclick="exportStudentReport()">&#128196; Export Student List (CSV)</button>
+              <button class="btn btn-outline btn-full" onclick="exportFacultyReport()">&#128196; Export Faculty List (CSV)</button>
+              <button class="btn btn-outline btn-full" onclick="exportAttendanceReport()">&#128196; Export Attendance (CSV)</button>
+              <button class="btn btn-outline btn-full" onclick="window.print()">&#128424; Print Full Report</button>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+
+      setTimeout(() => {
+        Charts.create('yearChart', {
+          type: 'bar',
+          data: {
+            labels: ['I Year', 'II Year', 'III Year', 'IV Year'],
+            datasets: [{ label: 'Students', data: [yearCount[1], yearCount[2], yearCount[3], yearCount[4]], backgroundColor: ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B'], borderRadius: 8, borderSkipped: false }]
+          },
+          options: { ...Charts.getDefaults(), plugins: { legend: { display: false } } }
+        });
+        Charts.genderDistributionChart('genderChart', genderCount.Male, genderCount.Female);
+        Charts.monthlyAttendanceChart('monthChart', ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], [92, 88, 94, 90, 91, 89]);
+      }, 100);
+    }, 400);
+
+    async function exportStudentReport() {
+      try {
+        const students = await DB.getAll('students', [DB.orderBy('name')]);
+        Utils.exportToCSV(students.map(s => ({ Name: s.name, 'Reg No': s.registerNumber, Year: s.year, Section: s.section, Gender: s.gender, Phone: s.phone, Email: s.email, Status: s.status })), 'students_report');
+        Toast.success('Exported', 'Student report downloaded');
+      } catch (e) { Toast.error('Error', e.message); }
+    }
+
+    async function exportFacultyReport() {
+      try {
+        const faculty = await DB.getAll('faculty', [DB.orderBy('name')]);
+        Utils.exportToCSV(faculty.map(f => ({ Name: f.name, 'ID': f.facultyId, Designation: f.designation, Qualification: f.qualification, Phone: f.phone, Email: f.email })), 'faculty_report');
+        Toast.success('Exported', 'Faculty report downloaded');
+      } catch (e) { Toast.error('Error', e.message); }
+    }
+
+    async function exportAttendanceReport() {
+      try {
+        const records = await DB.getAll('attendance', [DB.orderBy('date', 'desc')]);
+        Utils.exportToCSV(records.map(r => ({ Student: r.studentName, 'Reg No': r.registerNumber, Date: r.date, Status: r.status })), 'attendance_report');
+        Toast.success('Exported', 'Attendance report downloaded');
+      } catch (e) { Toast.error('Error', e.message); }
+    }
+  </script>
+</body>
+</html>

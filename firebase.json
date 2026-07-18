@@ -1,0 +1,44 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "firestore.rules",
+      "storage.rules"
+    ],
+    "rewrites": [
+      {
+        "source": "/dashboard/admin/**",
+        "destination": "/dashboard/admin/index.html"
+      },
+      {
+        "source": "/dashboard/faculty/**",
+        "destination": "/dashboard/faculty/index.html"
+      },
+      {
+        "source": "/dashboard/student/**",
+        "destination": "/dashboard/student/index.html"
+      },
+      {
+        "source": "/dashboard/parent/**",
+        "destination": "/dashboard/parent/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.css",
+        "headers": [
+          { "key": "Cache-Control", "value": "max-age=31536000" }
+        ]
+      },
+      {
+        "source": "**/*.js",
+        "headers": [
+          { "key": "Cache-Control", "value": "max-age=31536000" }
+        ]
+      }
+    ]
+  }
+}

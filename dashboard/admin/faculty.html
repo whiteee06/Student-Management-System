@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Faculty - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allFaculty = [];
+    let filteredFaculty = [];
+    let currentPage = 1;
+    const perPage = 10;
+
+    initDashboard('admin', 'faculty');
+    setTimeout(loadFaculty, 400);
+
+    async function loadFaculty() {
+      try { allFaculty = await DB.getAll('faculty', [DB.orderBy('name', 'asc')]); }
+      catch (e) { allFaculty = []; }
+      filteredFaculty = [...allFaculty];
+      renderFaculty();
+    }
+
+    function renderFaculty() {
+      const start = (currentPage - 1) * perPage;
+      const pageData = filteredFaculty.slice(start, start + perPage);
+
+      const content = `
+        ${Components.pageHeader('Manage Faculty', `${filteredFaculty.length} faculty members`, `
+          <button class="btn btn-primary btn-sm" onclick="showAddFaculty()">+ Add Faculty</button>
+          <button class="btn btn-outline btn-sm" onclick="exportTableToCSV('facultyTable','faculty')">&#128194; Export</button>
+        `)}
+
+        ${Components.searchFilterBar([
+          { id: 'designation', label: 'Designation', options: [{value:'Professor',label:'Professor'},{value:'Associate Professor',label:'Associate Prof'},{value:'Assistant Professor',label:'Assistant Prof'}] }
+        ])}
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none">
+            <table class="table" id="facultyTable">
+              <thead>
+                <tr>
+                  <th>Faculty</th>
+                  <th>Faculty ID</th>
+                  <th>Designation</th>
+                  <th>Qualification</th>
+                  <th>Subjects</th>
+                  <th>Phone</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pageData.length ? pageData.map(f => `
+                  <tr>
+                    <td>
+                      <div class="flex items-center gap-3">
+                        <div class="avatar avatar-placeholder" style="font-size:12px;background:var(--gradient-accent)">${Utils.getInitials(f.name)}</div>
+                        <div>
+                          <div style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(f.name || 'N/A')}</div>
+                          <div style="font-size:var(--font-size-xs);color:var(--text-secondary)">${Utils.escapeHtml(f.email || '')}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span style="font-family:monospace;font-size:var(--font-size-sm)">${Utils.escapeHtml(f.facultyId || 'N/A')}</span></td>
+                    <td><span class="badge badge-primary">${f.designation || 'N/A'}</span></td>
+                    <td>${f.qualification || 'N/A'}</td>
+                    <td style="max-width:200px">${Utils.truncate(f.subjects || 'N/A', 40)}</td>
+                    <td>${f.phone || 'N/A'}</td>
+                    <td>
+                      <div class="table-actions">
+                        <button class="btn btn-ghost btn-sm btn-icon" onclick="editFaculty('${f.id}')">&#9998;</button>
+                        <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--danger)" onclick="deleteFaculty('${f.id}','${Utils.escapeHtml(f.name)}')">&#128465;</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('') : `<tr><td colspan="7">${Components.emptyState('&#128105;', 'No Faculty', 'No faculty members found.')}</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        ${Components.pagination(filteredFaculty.length, perPage, currentPage, 'goToPage')}
+
+        <div class="modal-overlay" id="facultyModal">
+          <div class="modal">
+            <div class="modal-header">
+              <h3 class="modal-title" id="facModalTitle">Add Faculty</h3>
+              <button class="modal-close" onclick="Utils.hideModal('facultyModal')">&#10005;</button>
+            </div>
+            <div class="modal-body">
+              <form id="facultyForm" onsubmit="saveFaculty(event)">
+                <input type="hidden" id="editFacultyId">
+                <div class="form-group"><label class="form-label">Name <span class="required">*</span></label><input type="text" class="form-input" id="facName" required></div>
+                <div class="form-group"><label class="form-label">Faculty ID <span class="required">*</span></label><input type="text" class="form-input" id="facId" required></div>
+                <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="facEmail"></div>
+                <div class="form-group"><label class="form-label">Phone</label><input type="tel" class="form-input" id="facPhone"></div>
+                <div class="form-group"><label class="form-label">Designation</label>
+                  <select class="form-input form-select" id="facDesignation">
+                    <option value="">Select</option>
+                    <option>Professor</option><option>Associate Professor</option><option>Assistant Professor</option><option>Lecturer</option>
+                  </select>
+                </div>
+                <div class="form-group"><label class="form-label">Qualification</label><input type="text" class="form-input" id="facQualification" placeholder="e.g. Ph.D., M.E."></div>
+                <div class="form-group"><label class="form-label">Subjects</label><textarea class="form-input form-textarea" id="facSubjects" rows="2" placeholder="Comma-separated"></textarea></div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" onclick="Utils.hideModal('facultyModal')">Cancel</button>
+              <button class="btn btn-primary" onclick="document.getElementById('facultyForm').requestSubmit()">Save</button>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function showAddFaculty() {
+      document.getElementById('facModalTitle').textContent = 'Add Faculty';
+      document.getElementById('editFacultyId').value = '';
+      document.getElementById('facultyForm').reset();
+      Utils.showModal('facultyModal');
+    }
+
+    function editFaculty(id) {
+      const f = allFaculty.find(x => x.id === id);
+      if (!f) return;
+      document.getElementById('facModalTitle').textContent = 'Edit Faculty';
+      document.getElementById('editFacultyId').value = id;
+      document.getElementById('facName').value = f.name || '';
+      document.getElementById('facId').value = f.facultyId || '';
+      document.getElementById('facEmail').value = f.email || '';
+      document.getElementById('facPhone').value = f.phone || '';
+      document.getElementById('facDesignation').value = f.designation || '';
+      document.getElementById('facQualification').value = f.qualification || '';
+      document.getElementById('facSubjects').value = f.subjects || '';
+      Utils.showModal('facultyModal');
+    }
+
+    async function saveFaculty(e) {
+      e.preventDefault();
+      const id = document.getElementById('editFacultyId').value;
+      const data = {
+        name: Utils.sanitize(document.getElementById('facName').value),
+        facultyId: document.getElementById('facId').value.trim(),
+        email: Utils.sanitize(document.getElementById('facEmail').value),
+        phone: document.getElementById('facPhone').value.trim(),
+        designation: document.getElementById('facDesignation').value,
+        qualification: document.getElementById('facQualification').value.trim(),
+        subjects: document.getElementById('facSubjects').value.trim(),
+        status: 'active'
+      };
+      if (!data.name || !data.facultyId) { Toast.warning('Required', 'Name and Faculty ID are required'); return; }
+      try {
+        if (id) { await DB.update('faculty', id, data); Toast.success('Updated', 'Faculty updated'); }
+        else { await DB.add('faculty', data); Toast.success('Added', 'Faculty added'); }
+        Utils.hideModal('facultyModal');
+        loadFaculty();
+      } catch (err) { Toast.error('Error', err.message); }
+    }
+
+    async function deleteFaculty(id, name) {
+      confirmDelete(`Delete faculty "${name}"?`, async () => {
+        try { await DB.remove('faculty', id); Toast.success('Deleted', 'Faculty removed'); loadFaculty(); }
+        catch (e) { Toast.error('Error', e.message); }
+      });
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      renderFaculty();
+    }
+
+    window._filterCallback = () => {
+      const q = document.getElementById('searchInput')?.value.toLowerCase() || '';
+      const desig = document.getElementById('filter_designation')?.value || '';
+      filteredFaculty = allFaculty.filter(f => {
+        if (q && !(f.name || '').toLowerCase().includes(q) && !(f.facultyId || '').toLowerCase().includes(q)) return false;
+        if (desig && f.designation !== desig) return false;
+        return true;
+      });
+      currentPage = 1;
+      renderFaculty();
+    };
+  </script>
+</body>
+</html>

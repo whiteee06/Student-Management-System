@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty Dashboard - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/charts.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    initDashboard('faculty', 'dashboard');
+
+    setTimeout(async () => {
+      let totalStudents = 0, pendingLeaves = 0, assignments = 0, materials = 0;
+      try {
+        const [students, leaves, assigns, mats] = await Promise.all([
+          DB.getAll('students'),
+          DB.getAll('leave_requests', [DB.where('status', '==', 'pending')]),
+          DB.getAll('assignments'),
+          DB.getAll('study_materials')
+        ]);
+        totalStudents = students.length;
+        pendingLeaves = leaves.length;
+        assignments = assigns.length;
+        materials = mats.length;
+      } catch (e) {}
+
+      const content = `
+        ${Components.pageHeader('Faculty Dashboard', 'Welcome back, Faculty!', '')}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#127891;', totalStudents, 'Total Students', 'primary', 0)}
+          ${Components.statCard('&#128221;', assignments, 'Assignments', 'success', 100)}
+          ${Components.statCard('&#128218;', materials, 'Study Materials', 'accent', 200)}
+          ${Components.statCard('&#9998;', pendingLeaves, 'Pending Leaves', 'warning', 300)}
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-2">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Today's Schedule</h3>
+            <div>
+              <div class="flex items-center gap-3 mb-3" style="padding:12px;background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                <div style="width:4px;height:40px;border-radius:2px;background:var(--primary)"></div>
+                <div>
+                  <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">Data Structures - III B</p>
+                  <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">9:00 AM - 10:00 AM | Room 301</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 mb-3" style="padding:12px;background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                <div style="width:4px;height:40px;border-radius:2px;background:var(--success)"></div>
+                <div>
+                  <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">Machine Learning - II A</p>
+                  <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">11:00 AM - 12:00 PM | Room 205</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3" style="padding:12px;background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                <div style="width:4px;height:40px;border-radius:2px;background:var(--warning)"></div>
+                <div>
+                  <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">Python Lab - I A</p>
+                  <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">2:00 PM - 4:00 PM | Lab 2</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card animate-fade-in-up stagger-3">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Student Performance</h3>
+            <div style="height:260px;position:relative"><canvas id="perfChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="card animate-fade-in-up stagger-4 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold)">Quick Actions</h3>
+          </div>
+          <div class="grid grid-4" style="gap:12px">
+            <a href="/dashboard/faculty/attendance.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#9745;</span><span>Mark Attendance</span>
+            </a>
+            <a href="/dashboard/faculty/assignments.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#128221;</span><span>Upload Assignment</span>
+            </a>
+            <a href="/dashboard/faculty/materials.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#128218;</span><span>Study Materials</span>
+            </a>
+            <a href="/dashboard/faculty/marks.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#128202;</span><span>Enter Marks</span>
+            </a>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+
+      setTimeout(() => {
+        Charts.studentPerformanceChart('perfChart',
+          ['Unit 1', 'Unit 2', 'Unit 3', 'Unit 4', 'Assignment'],
+          [78, 82, 75, 88, 92]
+        );
+      }, 100);
+    }, 300);
+  </script>
+</body>
+</html>

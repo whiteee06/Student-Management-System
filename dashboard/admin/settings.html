@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let settings = {};
+    let academicYears = [];
+
+    initDashboard('admin', 'settings');
+    setTimeout(loadSettings, 400);
+
+    async function loadSettings() {
+      try {
+        const doc = await DB.get('settings', 'system');
+        settings = doc || {};
+      } catch (e) { settings = {}; }
+      try { academicYears = await DB.getAll('academicYears', [DB.orderBy('name', 'desc')]); }
+      catch (e) { academicYears = []; }
+      renderPage();
+    }
+
+    function renderPage() {
+      const content = `
+        ${Components.pageHeader('System Settings', 'Configure system preferences and options')}
+
+        <div class="grid grid-2" style="gap:24px">
+
+          <div class="card animate-fade-in-up">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:20px">&#127769; Appearance</h3>
+            <div class="form-group">
+              <label class="form-label">Theme</label>
+              <div class="flex gap-2">
+                <button class="btn btn-sm ${Theme.current() === 'light' ? 'btn-primary' : 'btn-outline'}" onclick="Theme.set('light');renderPage()">&#9728; Light</button>
+                <button class="btn btn-sm ${Theme.current() === 'dark' ? 'btn-primary' : 'btn-outline'}" onclick="Theme.set('dark');renderPage()">&#9790; Dark</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Sidebar Compact Mode</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--font-size-sm)">
+                <input type="checkbox" id="compactSidebar" ${settings.compactSidebar ? 'checked' : ''} onchange="saveSetting('compactSidebar',this.checked)"> Enable compact sidebar
+              </label>
+            </div>
+          </div>
+
+          <div class="card animate-fade-in-up stagger-2">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:20px">&#128276; Notifications</h3>
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--font-size-sm)">
+                <input type="checkbox" id="notifEnabled" ${settings.notificationsEnabled !== false ? 'checked' : ''} onchange="saveSetting('notificationsEnabled',this.checked)"> Enable Notifications
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--font-size-sm)">
+                <input type="checkbox" id="notifEmail" ${settings.emailNotifications ? 'checked' : ''} onchange="saveSetting('emailNotifications',this.checked)"> Email Notifications
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--font-size-sm)">
+                <input type="checkbox" id="notifAttendance" ${settings.attendanceAlerts ? 'checked' : ''} onchange="saveSetting('attendanceAlerts',this.checked)"> Low Attendance Alerts (&lt;75%)
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--font-size-sm)">
+                <input type="checkbox" id="notifMarks" ${settings.marksNotifications ? 'checked' : ''} onchange="saveSetting('marksNotifications',this.checked)"> Marks Published Notifications
+              </label>
+            </div>
+          </div>
+
+          <div class="card animate-fade-in-up stagger-3">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:20px">&#128197; Academic Configuration</h3>
+            <div class="form-group">
+              <label class="form-label">Current Academic Year</label>
+              <select class="form-input form-select" id="currentAcademicYear" onchange="saveSetting('currentAcademicYear',this.value)">
+                <option value="">Select</option>
+                ${academicYears.map(y => `<option value="${y.id}" ${settings.currentAcademicYear === y.id ? 'selected' : ''}>${Utils.escapeHtml(y.name)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Current Semester</label>
+              <select class="form-input form-select" id="currentSemester" onchange="saveSetting('currentSemester',this.value)">
+                <option value="">Select</option>
+                <option value="1" ${settings.currentSemester === '1' ? 'selected' : ''}>1</option>
+                <option value="2" ${settings.currentSemester === '2' ? 'selected' : ''}>2</option>
+                <option value="3" ${settings.currentSemester === '3' ? 'selected' : ''}>3</option>
+                <option value="4" ${settings.currentSemester === '4' ? 'selected' : ''}>4</option>
+                <option value="5" ${settings.currentSemester === '5' ? 'selected' : ''}>5</option>
+                <option value="6" ${settings.currentSemester === '6' ? 'selected' : ''}>6</option>
+                <option value="7" ${settings.currentSemester === '7' ? 'selected' : ''}>7</option>
+                <option value="8" ${settings.currentSemester === '8' ? 'selected' : ''}>8</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Attendance Minimum %</label>
+              <input type="number" class="form-input" id="minAttendance" min="0" max="100" value="${settings.minAttendance || 75}" onchange="saveSetting('minAttendance',parseInt(this.value))" placeholder="75">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Max Marks (Internal)</label>
+              <input type="number" class="form-input" id="maxMarks" value="${settings.maxMarks || 100}" onchange="saveSetting('maxMarks',parseInt(this.value))" placeholder="100">
+            </div>
+          </div>
+
+          <div class="card animate-fade-in-up stagger-4">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:20px">&#128190; Backup & Restore</h3>
+            <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:16px">Export all data as JSON for backup. Import to restore.</p>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <button class="btn btn-outline btn-full" onclick="backupData()">&#128190; Export Backup (JSON)</button>
+              <div class="form-group" style="margin:0">
+                <input type="file" class="form-input" id="restoreFile" accept=".json" onchange="restoreData(event)">
+              </div>
+              <button class="btn btn-outline btn-full" onclick="document.getElementById('restoreFile').click()">&#128194; Import Backup</button>
+            </div>
+          </div>
+
+          <div class="card animate-fade-in-up stagger-5" style="grid-column:1/-1">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:20px">&#128736; System Information</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px">
+              <div>
+                <p class="form-label">Application</p>
+                <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">AI&DS Student Management System</p>
+              </div>
+              <div>
+                <p class="form-label">Version</p>
+                <p style="font-size:var(--font-size-sm)">1.0.0</p>
+              </div>
+              <div>
+                <p class="form-label">Firebase Project</p>
+                <p style="font-size:var(--font-size-sm)">${firebaseConfig?.projectId || 'Not configured'}</p>
+              </div>
+              <div>
+                <p class="form-label">Theme</p>
+                <p style="font-size:var(--font-size-sm)">${Utils.capitalize(Theme.current())}</p>
+              </div>
+              <div>
+                <p class="form-label">Current User</p>
+                <p style="font-size:var(--font-size-sm)">${Auth.getCurrentUser()?.email || 'N/A'}</p>
+              </div>
+              <div>
+                <p class="form-label">Last Settings Update</p>
+                <p style="font-size:var(--font-size-sm)">${settings.updatedAt ? Utils.formatDateTime(settings.updatedAt) : 'Never'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    async function saveSetting(key, value) {
+      settings[key] = value;
+      try {
+        await DB.set('settings', 'system', settings);
+        Toast.success('Saved', 'Setting updated');
+      } catch (err) { Toast.error('Error', err.message); }
+    }
+
+    async function backupData() {
+      try {
+        const collections = ['students', 'faculty', 'parents', 'subjects', 'marks', 'attendance', 'timetable', 'notices', 'events', 'gallery', 'departments', 'academicYears', 'semesters', 'settings'];
+        const backup = { version: '1.0.0', date: new Date().toISOString(), data: {} };
+        for (const col of collections) {
+          try { backup.data[col] = await DB.getAll(col); }
+          catch (e) { backup.data[col] = []; }
+        }
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `sms_backup_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        Toast.success('Backup Created', 'Data exported successfully');
+      } catch (err) { Toast.error('Error', err.message); }
+    }
+
+    async function restoreData(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      confirmDelete('This will merge imported data with existing data. Continue?', async () => {
+        try {
+          const text = await file.text();
+          const backup = JSON.parse(text);
+          if (!backup.data) throw new Error('Invalid backup file');
+          let count = 0;
+          for (const [col, records] of Object.entries(backup.data)) {
+            if (Array.isArray(records)) {
+              for (const record of records) {
+                const { id, ...data } = record;
+                await DB.set(col, id, data);
+                count++;
+              }
+            }
+          }
+          Toast.success('Restored', `${count} records imported`);
+          loadSettings();
+        } catch (err) { Toast.error('Error', 'Restore failed: ' + err.message); }
+      });
+      e.target.value = '';
+    }
+  </script>
+</body>
+</html>

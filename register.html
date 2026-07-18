@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - AI&DS Student Management System</title>
+  <link rel="stylesheet" href="assets/css/main.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-left">
+      <div class="auth-hero">
+        <div class="auth-hero-badge">&#127891; Department of AI & Data Science</div>
+        <h1 class="auth-hero-title">Create Your Account</h1>
+        <p class="auth-hero-text">Join the AI&DS Student Management System at AVS College of Technology, Salem.</p>
+        <div class="auth-hero-features">
+          <div class="auth-hero-feature">
+            <span class="feature-icon">&#10004;</span>
+            <span>Access your academic dashboard</span>
+          </div>
+          <div class="auth-hero-feature">
+            <span class="feature-icon">&#10004;</span>
+            <span>Track attendance and assignments</span>
+          </div>
+          <div class="auth-hero-feature">
+            <span class="feature-icon">&#10004;</span>
+            <span>Connect with faculty and peers</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="auth-right">
+      <div class="auth-form-container">
+        <div class="auth-card">
+          <div class="auth-logo">
+            <div class="auth-logo-icon">AI</div>
+            <div class="auth-logo-text">AI&DS SMS</div>
+          </div>
+          <h2 class="auth-title">Create Account</h2>
+          <p class="auth-subtitle">Fill in your details to register</p>
+
+          <form class="auth-form" id="registerForm" onsubmit="handleRegister(event)">
+            <!-- Parent Registration Info (shown when parent role is selected) -->
+            <div id="parentRegInfo" style="display:none;background:rgba(37,99,235,0.06);border:1px solid rgba(37,99,235,0.15);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                <span style="font-size:22px">&#128106;</span>
+                <strong style="font-size:var(--font-size-sm);color:var(--primary)">Parent Login Info</strong>
+              </div>
+              <p style="font-size:var(--font-size-xs);color:var(--text-secondary);line-height:1.7;margin-bottom:10px">Parents do <strong>not</strong> need to register separately. Your account is created automatically on first login.</p>
+              <p style="font-size:var(--font-size-xs);color:var(--text-secondary);line-height:1.7;margin-bottom:0">To login as a parent, go to the <a href="login.html" style="color:var(--primary);font-weight:var(--font-medium)">Login page</a>, select <strong>Parent</strong> role, and enter your child's <strong>registered mobile number</strong> and <strong>date of birth</strong>.</p>
+            </div>
+
+            <div id="parentRegFields" style="display:none">
+              <div class="form-group">
+                <label class="form-label">Student's Mobile Number <span class="required">*</span></label>
+                <div class="input-icon-wrapper">
+                  <span class="input-icon">&#128241;</span>
+                  <input type="tel" class="form-input" id="regParentPhone" placeholder="Student's registered phone" maxlength="10" pattern="[6-9][0-9]{9}">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Student's Date of Birth <span class="required">*</span></label>
+                <div class="input-icon-wrapper">
+                  <span class="input-icon">&#128197;</span>
+                  <input type="date" class="form-input" id="regParentDob" style="padding-left:40px">
+                </div>
+              </div>
+            </div>
+
+            <div id="standardRegFields">
+              <div class="form-group">
+                <label class="form-label">Full Name <span class="required">*</span></label>
+                <div class="input-icon-wrapper">
+                  <span class="input-icon">&#128100;</span>
+                  <input type="text" class="form-input" id="regName" placeholder="Enter full name" required>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email Address <span class="required">*</span></label>
+                <div class="input-icon-wrapper">
+                  <span class="input-icon">&#9993;</span>
+                  <input type="email" class="form-input" id="regEmail" placeholder="Enter email" required>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Register Number / Faculty ID <span class="required">*</span></label>
+                <div class="input-icon-wrapper">
+                  <span class="input-icon">&#128196;</span>
+                  <input type="text" class="form-input" id="regNumber" placeholder="e.g. 21ADS001" required>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Role <span class="required">*</span></label>
+              <div class="input-icon-wrapper">
+                <span class="input-icon">&#128101;</span>
+                <select class="form-input form-select" id="regRole" required style="padding-left:40px" onchange="handleRegRoleChange()">
+                  <option value="">Select Role</option>
+                  <option value="student">Student</option>
+                  <option value="faculty">Faculty</option>
+                  <option value="parent">Parent</option>
+                </select>
+              </div>
+            </div>
+            <div id="passwordFields">
+              <div class="form-group">
+                <label class="form-label">Password <span class="required">*</span></label>
+                <div class="input-icon-wrapper">
+                  <span class="input-icon">&#128274;</span>
+                  <input type="password" class="form-input" id="regPassword" placeholder="Min 6 characters" required minlength="6">
+                  <button type="button" class="input-toggle" onclick="toggleRegPassword()">&#128065;</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Confirm Password <span class="required">*</span></label>
+                <div class="input-icon-wrapper">
+                  <span class="input-icon">&#128274;</span>
+                  <input type="password" class="form-input" id="regConfirmPassword" placeholder="Re-enter password" required>
+                </div>
+              </div>
+            </div>
+            <label class="auth-checkbox" style="margin-bottom:20px">
+              <input type="checkbox" id="regAgree" required> I agree to the terms and conditions
+            </label>
+            <button type="submit" class="btn btn-primary btn-full" id="registerBtn">
+              <span id="regBtnText">Create Account</span>
+              <span id="regSpinner" style="display:none;width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite"></span>
+            </button>
+          </form>
+
+          <div class="auth-footer">
+            Already have an account? <a href="login.html">Sign In</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="assets/firebase/config.js"></script>
+  <script src="assets/js/utils.js"></script>
+  <script src="assets/js/toast.js"></script>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/db.js"></script>
+  <script>
+    Theme.init();
+    DB.init();
+
+    function toggleRegPassword() {
+      const input = document.getElementById('regPassword');
+      const btn = input.parentElement.querySelector('.input-toggle');
+      if (input.type === 'password') { input.type = 'text'; btn.innerHTML = '&#128064;'; }
+      else { input.type = 'password'; btn.innerHTML = '&#128065;'; }
+    }
+
+    function handleRegRoleChange() {
+      const role = document.getElementById('regRole').value;
+      const parentInfo = document.getElementById('parentRegInfo');
+      const parentFields = document.getElementById('parentRegFields');
+      const standardFields = document.getElementById('standardRegFields');
+      const passwordFields = document.getElementById('passwordFields');
+      const registerBtn = document.getElementById('registerBtn');
+
+      if (role === 'parent') {
+        parentInfo.style.display = 'block';
+        parentFields.style.display = 'block';
+        standardFields.style.display = 'none';
+        passwordFields.style.display = 'none';
+        registerBtn.style.display = 'none';
+      } else {
+        parentInfo.style.display = 'none';
+        parentFields.style.display = 'none';
+        standardFields.style.display = 'block';
+        passwordFields.style.display = 'block';
+        registerBtn.style.display = 'flex';
+      }
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const regNumber = document.getElementById('regNumber').value.trim();
+      const role = document.getElementById('regRole').value;
+      const password = document.getElementById('regPassword').value;
+      const confirmPassword = document.getElementById('regConfirmPassword').value;
+      const btn = document.getElementById('registerBtn');
+
+      if (role === 'parent') {
+        Toast.info('Parent Login', 'Parents login using Student Mobile + DOB. Go to Login page and select Parent role.');
+        return;
+      }
+
+      if (!name || !email || !regNumber || !role || !password) {
+        Toast.warning('Validation', 'Please fill all required fields');
+        return;
+      }
+      if (!Utils.validateEmail(email)) {
+        Toast.error('Invalid Email', 'Enter a valid email address');
+        return;
+      }
+      if (password !== confirmPassword) {
+        Toast.error('Mismatch', 'Passwords do not match');
+        return;
+      }
+      if (password.length < 6) {
+        Toast.error('Weak Password', 'Password must be at least 6 characters');
+        return;
+      }
+
+      btn.disabled = true;
+      document.getElementById('regBtnText').style.display = 'none';
+      document.getElementById('regSpinner').style.display = 'inline-block';
+
+      try {
+        if (role === 'student') {
+          const existing = await DB.getAll('students', [DB.where('registerNumber', '==', regNumber)]);
+          if (existing.length) {
+            Toast.error('Duplicate', 'Register number already exists');
+            return;
+          }
+        }
+        const user = await Auth.register({ email, password, role, name });
+        if (role === 'student') {
+          await DB.add('students', { uid: user.uid, name, email, registerNumber: regNumber, role, status: 'active' });
+        } else if (role === 'faculty') {
+          await DB.add('faculty', { uid: user.uid, name, email, facultyId: regNumber, role, status: 'active' });
+        }
+        Toast.success('Account Created', 'You can now sign in');
+        setTimeout(() => window.location.href = 'login.html', 1500);
+      } catch (error) {
+        const msgs = {
+          'auth/email-already-in-use': 'Email already registered',
+          'auth/weak-password': 'Password is too weak',
+          'auth/invalid-email': 'Invalid email address'
+        };
+        Toast.error('Registration Failed', msgs[error.code] || error.message);
+      } finally {
+        btn.disabled = false;
+        document.getElementById('regBtnText').style.display = 'inline';
+        document.getElementById('regSpinner').style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>

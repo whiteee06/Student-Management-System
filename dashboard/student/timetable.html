@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timetable - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let timetableData = [];
+    let studentData = null;
+
+    initDashboard('student', 'timetable');
+    setTimeout(loadTimetable, 400);
+
+    async function loadTimetable() {
+      const user = Auth.getCurrentUser();
+      if (!user) return;
+      try {
+        const students = await DB.getAll('students', [DB.where('uid', '==', user.uid)]);
+        studentData = students[0] || null;
+        if (studentData) {
+          timetableData = await DB.getAll('timetable', [
+            DB.where('year', '==', studentData.year || ''),
+            DB.where('section', '==', studentData.section || '')
+          ]);
+        }
+        if (!timetableData.length) {
+          timetableData = await DB.getAll('timetable');
+        }
+      } catch (e) { timetableData = []; }
+      renderPage();
+    }
+
+    function renderPage() {
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const periods = ['8:30 - 9:20', '9:20 - 10:10', '10:30 - 11:20', '11:20 - 12:10', '1:00 - 1:50', '1:50 - 2:40', '3:00 - 3:50', '3:50 - 4:40'];
+
+      const grid = {};
+      timetableData.forEach(t => {
+        const day = (t.day || '').toLowerCase();
+        const period = parseInt(t.period) || 0;
+        if (!grid[day]) grid[day] = {};
+        grid[day][period] = t;
+      });
+
+      const subjectColors = ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
+      let colorIndex = 0;
+      const subjectColorMap = {};
+
+      const content = `
+        ${Components.pageHeader('Weekly Timetable', studentData ? `${studentData.year || '-'} Year, Section ${studentData.section || '-'}` : 'Your class schedule', '')}
+
+        <div class="card animate-fade-in-up" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none;overflow-x:auto">
+            <table class="table" style="min-width:900px">
+              <thead>
+                <tr>
+                  <th style="min-width:100px">Day</th>
+                  ${periods.map((p, i) => `<th style="min-width:120px;font-size:var(--font-size-xs)">${p}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                ${days.map(day => {
+                  const dayLower = day.toLowerCase();
+                  return `
+                    <tr>
+                      <td style="font-weight:var(--font-semibold);font-size:var(--font-size-sm)">${day}</td>
+                      ${periods.map((_, i) => {
+                        const period = i + 1;
+                        const entry = grid[dayLower]?.[period] || grid[day]?.[period];
+                        if (entry) {
+                          const subject = entry.subject || 'Free';
+                          if (!subjectColorMap[subject]) {
+                            subjectColorMap[subject] = subjectColors[colorIndex % subjectColors.length];
+                            colorIndex++;
+                          }
+                          const color = subjectColorMap[subject];
+                          return `<td>
+                            <div style="padding:8px;border-radius:var(--radius-sm);background:${color}15;border-left:3px solid ${color}">
+                              <div style="font-size:var(--font-size-xs);font-weight:var(--font-medium);color:${color}">${Utils.escapeHtml(subject)}</div>
+                              ${entry.faculty ? `<div style="font-size:10px;color:var(--text-secondary);margin-top:2px">${Utils.escapeHtml(entry.faculty)}</div>` : ''}
+                              ${entry.room ? `<div style="font-size:10px;color:var(--text-tertiary)">${Utils.escapeHtml(entry.room)}</div>` : ''}
+                            </div>
+                          </td>`;
+                        }
+                        return `<td style="background:var(--bg-tertiary);opacity:0.5"><span style="font-size:var(--font-size-xs);color:var(--text-tertiary)">-</span></td>`;
+                      }).join('')}
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid grid-3 mt-6" style="gap:12px">
+          ${Object.entries(subjectColorMap).map(([subject, color]) => `
+            <div class="flex items-center gap-2" style="padding:8px 12px;background:var(--bg-tertiary);border-radius:var(--radius-sm)">
+              <div style="width:12px;height:12px;border-radius:3px;background:${color}"></div>
+              <span style="font-size:var(--font-size-xs);font-weight:var(--font-medium)">${Utils.escapeHtml(subject)}</span>
+            </div>
+          `).join('')}
+        </div>
+
+        ${!timetableData.length ? `<div style="margin-top:24px">${Components.emptyState('&#128197;', 'No Timetable', 'No timetable data available. Contact your department.')}</div>` : ''}
+      `;
+      loadPageContent(content);
+    }
+  </script>
+</body>
+</html>

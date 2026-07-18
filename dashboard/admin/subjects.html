@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Subjects - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allSubjects = [];
+    let filteredSubjects = [];
+    let allFaculty = [];
+    let currentPage = 1;
+    const perPage = 10;
+
+    initDashboard('admin', 'subjects');
+    setTimeout(loadAll, 400);
+
+    async function loadAll() {
+      try {
+        [allSubjects, allFaculty] = await Promise.all([
+          DB.getAll('subjects', [DB.orderBy('name', 'asc')]),
+          DB.getAll('faculty', [DB.orderBy('name', 'asc')])
+        ]);
+      } catch (e) { allSubjects = []; allFaculty = []; }
+      filteredSubjects = [...allSubjects];
+      renderSubjects();
+    }
+
+    function getFacultyOptions() {
+      return allFaculty.map(f => `<option value="${f.name}">${Utils.escapeHtml(f.name)} (${Utils.escapeHtml(f.facultyId || '')})</option>`).join('');
+    }
+
+    function renderSubjects() {
+      const start = (currentPage - 1) * perPage;
+      const pageData = filteredSubjects.slice(start, start + perPage);
+
+      const content = `
+        ${Components.pageHeader('Manage Subjects', `${filteredSubjects.length} subjects`, `
+          <button class="btn btn-primary btn-sm" onclick="showAddSubject()">+ Add Subject</button>
+          <button class="btn btn-outline btn-sm" onclick="exportTableToCSV('subjectsTable','subjects')">&#128194; Export</button>
+        `)}
+
+        ${Components.searchFilterBar([
+          { id: 'year', label: 'Year', options: [{value:'1',label:'I Year'},{value:'2',label:'II Year'},{value:'3',label:'III Year'},{value:'4',label:'IV Year'}] },
+          { id: 'semester', label: 'Semester', options: [{value:'1',label:'Sem 1'},{value:'2',label:'Sem 2'},{value:'3',label:'Sem 3'},{value:'4',label:'Sem 4'},{value:'5',label:'Sem 5'},{value:'6',label:'Sem 6'},{value:'7',label:'Sem 7'},{value:'8',label:'Sem 8'}] }
+        ])}
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none">
+            <table class="table" id="subjectsTable">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Code</th>
+                  <th>Year / Semester</th>
+                  <th>Credits</th>
+                  <th>Assigned Faculty</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pageData.length ? pageData.map(s => `
+                  <tr>
+                    <td>
+                      <div class="flex items-center gap-3">
+                        <div class="avatar avatar-placeholder" style="font-size:12px;background:var(--gradient-accent)">${Utils.getInitials(s.name)}</div>
+                        <div>
+                          <div style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(s.name || 'N/A')}</div>
+                          <div style="font-size:var(--font-size-xs);color:var(--text-secondary)">${Utils.escapeHtml(s.type || 'Theory')}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span style="font-family:monospace;font-size:var(--font-size-sm)">${Utils.escapeHtml(s.code || 'N/A')}</span></td>
+                    <td><span class="badge badge-primary">${s.year || '-'} / ${s.semester || '-'}</span></td>
+                    <td>${s.credits || 'N/A'}</td>
+                    <td>${Utils.escapeHtml(s.faculty || 'Unassigned')}</td>
+                    <td>
+                      <div class="table-actions">
+                        <button class="btn btn-ghost btn-sm btn-icon" onclick="editSubject('${s.id}')">&#9998;</button>
+                        <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--danger)" onclick="deleteSubject('${s.id}','${Utils.escapeHtml(s.name)}')">&#128465;</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('') : `<tr><td colspan="6">${Components.emptyState('&#128218;', 'No Subjects', 'No subjects added yet.')}</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        ${Components.pagination(filteredSubjects.length, perPage, currentPage, 'goToPage')}
+
+        <div class="modal-overlay" id="subjectModal">
+          <div class="modal">
+            <div class="modal-header">
+              <h3 class="modal-title" id="subjectModalTitle">Add Subject</h3>
+              <button class="modal-close" onclick="Utils.hideModal('subjectModal')">&#10005;</button>
+            </div>
+            <div class="modal-body">
+              <form id="subjectForm" onsubmit="saveSubject(event)">
+                <input type="hidden" id="editSubjectId">
+                <div class="form-group"><label class="form-label">Subject Name <span class="required">*</span></label><input type="text" class="form-input" id="subName" required placeholder="e.g. Data Structures"></div>
+                <div class="grid grid-2" style="gap:12px">
+                  <div class="form-group"><label class="form-label">Subject Code <span class="required">*</span></label><input type="text" class="form-input" id="subCode" required placeholder="e.g. CS301"></div>
+                  <div class="form-group"><label class="form-label">Credits</label><input type="number" class="form-input" id="subCredits" min="1" max="6" placeholder="e.g. 4"></div>
+                </div>
+                <div class="grid grid-2" style="gap:12px">
+                  <div class="form-group"><label class="form-label">Year <span class="required">*</span></label>
+                    <select class="form-input form-select" id="subYear" required>
+                      <option value="">Select</option>
+                      <option value="1">I Year</option><option value="2">II Year</option><option value="3">III Year</option><option value="4">IV Year</option>
+                    </select>
+                  </div>
+                  <div class="form-group"><label class="form-label">Semester <span class="required">*</span></label>
+                    <select class="form-input form-select" id="subSemester" required>
+                      <option value="">Select</option>
+                      <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+                      <option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group"><label class="form-label">Type</label>
+                  <select class="form-input form-select" id="subType">
+                    <option value="Theory">Theory</option><option value="Lab">Lab</option><option value="Theory + Lab">Theory + Lab</option>
+                  </select>
+                </div>
+                <div class="form-group"><label class="form-label">Assigned Faculty</label>
+                  <select class="form-input form-select" id="subFaculty">
+                    <option value="">Unassigned</option>
+                    ${getFacultyOptions()}
+                  </select>
+                </div>
+                <div class="form-group"><label class="form-label">Description</label><textarea class="form-input form-textarea" id="subDesc" rows="2" placeholder="Brief description"></textarea></div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" onclick="Utils.hideModal('subjectModal')">Cancel</button>
+              <button class="btn btn-primary" onclick="document.getElementById('subjectForm').requestSubmit()">Save</button>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function showAddSubject() {
+      document.getElementById('subjectModalTitle').textContent = 'Add Subject';
+      document.getElementById('editSubjectId').value = '';
+      document.getElementById('subjectForm').reset();
+      Utils.showModal('subjectModal');
+    }
+
+    function editSubject(id) {
+      const s = allSubjects.find(x => x.id === id);
+      if (!s) return;
+      document.getElementById('subjectModalTitle').textContent = 'Edit Subject';
+      document.getElementById('editSubjectId').value = id;
+      document.getElementById('subName').value = s.name || '';
+      document.getElementById('subCode').value = s.code || '';
+      document.getElementById('subCredits').value = s.credits || '';
+      document.getElementById('subYear').value = s.year || '';
+      document.getElementById('subSemester').value = s.semester || '';
+      document.getElementById('subType').value = s.type || 'Theory';
+      document.getElementById('subFaculty').value = s.faculty || '';
+      document.getElementById('subDesc').value = s.description || '';
+      Utils.showModal('subjectModal');
+    }
+
+    async function saveSubject(e) {
+      e.preventDefault();
+      const id = document.getElementById('editSubjectId').value;
+      const data = {
+        name: Utils.sanitize(document.getElementById('subName').value),
+        code: document.getElementById('subCode').value.trim().toUpperCase(),
+        credits: parseInt(document.getElementById('subCredits').value) || 3,
+        year: document.getElementById('subYear').value,
+        semester: document.getElementById('subSemester').value,
+        type: document.getElementById('subType').value,
+        faculty: document.getElementById('subFaculty').value,
+        description: Utils.sanitize(document.getElementById('subDesc').value)
+      };
+      if (!data.name || !data.code) { Toast.warning('Required', 'Name and Code are required'); return; }
+      try {
+        if (id) { await DB.update('subjects', id, data); Toast.success('Updated', 'Subject updated'); }
+        else { await DB.add('subjects', data); Toast.success('Added', 'Subject added'); }
+        Utils.hideModal('subjectModal');
+        loadAll();
+      } catch (err) { Toast.error('Error', err.message); }
+    }
+
+    async function deleteSubject(id, name) {
+      confirmDelete(`Delete subject "${name}"?`, async () => {
+        try { await DB.remove('subjects', id); Toast.success('Deleted', 'Subject removed'); loadAll(); }
+        catch (e) { Toast.error('Error', e.message); }
+      });
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      renderSubjects();
+    }
+
+    window._filterCallback = () => {
+      const q = document.getElementById('searchInput')?.value.toLowerCase() || '';
+      const year = document.getElementById('filter_year')?.value || '';
+      const sem = document.getElementById('filter_semester')?.value || '';
+      filteredSubjects = allSubjects.filter(s => {
+        if (q && !(s.name || '').toLowerCase().includes(q) && !(s.code || '').toLowerCase().includes(q) && !(s.faculty || '').toLowerCase().includes(q)) return false;
+        if (year && s.year !== year) return false;
+        if (sem && s.semester !== sem) return false;
+        return true;
+      });
+      currentPage = 1;
+      renderSubjects();
+    };
+  </script>
+</body>
+</html>

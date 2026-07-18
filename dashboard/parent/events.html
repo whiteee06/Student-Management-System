@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let events = [];
+
+    initDashboard('parent', 'events');
+    setTimeout(loadEvents, 400);
+
+    async function loadEvents() {
+      try { events = await DB.getAll('events', [DB.orderBy('date', 'desc')]); }
+      catch (e) { events = []; }
+      renderPage();
+    }
+
+    function renderPage() {
+      const gradients = ['var(--gradient-primary)', 'var(--gradient-accent)', 'var(--gradient-success)', 'var(--gradient-purple)', 'var(--gradient-warning)'];
+
+      const content = `
+        ${Components.pageHeader('Events', `${events.length} events`, '')}
+        <div class="grid grid-3" style="gap:20px">
+          ${events.length ? events.map((e, i) => `
+            <div class="card animate-fade-in-up" style="padding:0;overflow:hidden">
+              <div style="height:140px;background:${gradients[i % gradients.length]};display:flex;align-items:center;justify-content:center;font-size:40px;color:white">&#127891;</div>
+              <div style="padding:20px">
+                <div class="flex items-center gap-2 mb-2">
+                  <span style="font-size:var(--font-size-xs);color:var(--primary);font-weight:var(--font-medium)">&#128197; ${Utils.formatDate(e.date) || 'TBA'}</span>
+                  <span class="badge badge-primary">${Utils.escapeHtml(e.type || 'Event')}</span>
+                </div>
+                <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:8px">${Utils.escapeHtml(e.title)}</h3>
+                <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:8px">${Utils.escapeHtml(Utils.truncate(e.description || '', 120))}</p>
+                ${e.venue ? `<p style="font-size:var(--font-size-xs);color:var(--text-tertiary);margin-bottom:8px">&#128205; ${Utils.escapeHtml(e.venue)}</p>` : ''}
+                ${e.coordinator ? `<p style="font-size:var(--font-size-xs);color:var(--text-tertiary)">Coordinator: ${Utils.escapeHtml(e.coordinator)}</p>` : ''}
+                <div class="flex gap-2" style="margin-top:12px">
+                  ${e.registrationLink ? `<a href="${e.registrationLink}" target="_blank" class="btn btn-primary btn-sm">Register</a>` : ''}
+                </div>
+              </div>
+            </div>
+          `).join('') : Components.emptyState('&#127891;', 'No Events', 'No events scheduled yet.')}
+        </div>
+      `;
+      loadPageContent(content);
+    }
+  </script>
+</body>
+</html>

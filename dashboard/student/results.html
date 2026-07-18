@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Results - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/charts.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let marks = [];
+    let studentData = null;
+
+    initDashboard('student', 'results');
+    setTimeout(loadResults, 400);
+
+    async function loadResults() {
+      const user = Auth.getCurrentUser();
+      if (!user) return;
+      try {
+        const students = await DB.getAll('students', [DB.where('uid', '==', user.uid)]);
+        studentData = students[0] || null;
+        if (studentData) {
+          marks = await DB.getAll('marks', [DB.where('studentId', '==', studentData.id), DB.orderBy('subject', 'asc')]);
+        }
+      } catch (e) { marks = []; }
+      renderPage();
+    }
+
+    function getGrade(total) {
+      if (total >= 90) return 'A+';
+      if (total >= 80) return 'A';
+      if (total >= 70) return 'B+';
+      if (total >= 60) return 'B';
+      if (total >= 50) return 'C';
+      if (total >= 40) return 'D';
+      return 'F';
+    }
+
+    function getGradeColor(grade) {
+      if (grade === 'A+' || grade === 'A') return 'badge-success';
+      if (grade === 'B+' || grade === 'B') return 'badge-primary';
+      if (grade === 'C') return 'badge-warning';
+      return 'badge-danger';
+    }
+
+    function renderPage() {
+      const totalMarks = marks.length;
+      const totalScore = marks.reduce((sum, m) => sum + (parseInt(m.unit1) || 0) + (parseInt(m.unit2) || 0) + (parseInt(m.unit3) || 0) + (parseInt(m.assignment) || 0), 0);
+      const maxPossible = marks.length * 120;
+      const overallPerc = maxPossible > 0 ? Math.round((totalScore / maxPossible) * 100) : 0;
+      const avgScore = totalMarks > 0 ? Math.round(totalScore / totalMarks) : 0;
+
+      const content = `
+        ${Components.pageHeader('Internal Marks / Results', 'View your academic performance', '')}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#128202;', totalMarks, 'Subjects', 'primary', 0)}
+          ${Components.statCard('&#128200;', totalScore, 'Total Score', 'success', 100)}
+          ${Components.statCard('&#127942;', avgScore, 'Avg Score', 'warning', 200)}
+          ${Components.statCard('&#9745;', overallPerc + '%', 'Overall %', 'accent', 300)}
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-2">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Subject-wise Performance</h3>
+            <div style="height:280px;position:relative"><canvas id="marksChart"></canvas></div>
+          </div>
+          <div class="card animate-fade-in-up stagger-3">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Performance Breakdown</h3>
+            <div style="height:280px;position:relative"><canvas id="breakdownChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="card animate-fade-in-up stagger-4" style="padding:0;overflow:hidden">
+          <div style="padding:20px;border-bottom:1px solid var(--border)">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold)">Detailed Marks</h3>
+          </div>
+          <div class="table-container" style="border:none">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Unit 1 (30)</th>
+                  <th>Unit 2 (30)</th>
+                  <th>Unit 3 (40)</th>
+                  <th>Assignment (20)</th>
+                  <th>Total (120)</th>
+                  <th>Grade</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${marks.length ? marks.map(m => {
+                  const total = (parseInt(m.unit1) || 0) + (parseInt(m.unit2) || 0) + (parseInt(m.unit3) || 0) + (parseInt(m.assignment) || 0);
+                  const grade = getGrade(total);
+                  return `
+                    <tr>
+                      <td style="font-weight:var(--font-medium);font-size:var(--font-size-sm)">${Utils.escapeHtml(m.subject || 'N/A')}</td>
+                      <td>${m.unit1 ?? '-'}</td>
+                      <td>${m.unit2 ?? '-'}</td>
+                      <td>${m.unit3 ?? '-'}</td>
+                      <td>${m.assignment ?? '-'}</td>
+                      <td style="font-weight:var(--font-semibold)">${total}</td>
+                      <td><span class="badge ${getGradeColor(grade)}">${grade}</span></td>
+                    </tr>
+                  `;
+                }).join('') : `<tr><td colspan="7">${Components.emptyState('&#128202;', 'No Results', 'No internal marks available yet.')}</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+
+      if (marks.length) {
+        setTimeout(() => {
+          Charts.create('marksChart', {
+            type: 'bar',
+            data: {
+              labels: marks.map(m => (m.subject || '').length > 12 ? m.subject.substring(0, 12) + '...' : m.subject || 'N/A'),
+              datasets: [
+                { label: 'Unit 1', data: marks.map(m => parseInt(m.unit1) || 0), backgroundColor: '#2563EB', borderRadius: 4 },
+                { label: 'Unit 2', data: marks.map(m => parseInt(m.unit2) || 0), backgroundColor: '#06B6D4', borderRadius: 4 },
+                { label: 'Unit 3', data: marks.map(m => parseInt(m.unit3) || 0), backgroundColor: '#22C55E', borderRadius: 4 },
+                { label: 'Assignment', data: marks.map(m => parseInt(m.assignment) || 0), backgroundColor: '#F59E0B', borderRadius: 4 }
+              ]
+            },
+            options: { ...Charts.getDefaults(), plugins: { legend: { labels: { font: { family: 'Poppins', size: 11 } } } }, scales: { ...Charts.getDefaults().scales, x: { ...Charts.getDefaults().scales.x, stacked: true }, y: { ...Charts.getDefaults().scales.y, stacked: true } } }
+          });
+
+          const totals = marks.map(m => (parseInt(m.unit1) || 0) + (parseInt(m.unit2) || 0) + (parseInt(m.unit3) || 0) + (parseInt(m.assignment) || 0));
+          Charts.create('breakdownChart', {
+            type: 'radar',
+            data: {
+              labels: marks.map(m => (m.subject || '').length > 10 ? m.subject.substring(0, 10) + '...' : m.subject || 'N/A'),
+              datasets: [{
+                label: 'Score',
+                data: totals,
+                backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                borderColor: '#2563EB',
+                pointBackgroundColor: '#2563EB',
+                pointRadius: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: { r: { beginAtZero: true, max: 120, ticks: { font: { family: 'Poppins', size: 10 } }, grid: { color: 'rgba(148,163,184,0.2)' } } }
+            }
+          });
+        }, 100);
+      }
+    }
+  </script>
+</body>
+</html>

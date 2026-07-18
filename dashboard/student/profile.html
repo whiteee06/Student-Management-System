@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    const role = Auth.getRole() || 'student';
+    initDashboard(role, 'profile');
+    setTimeout(loadProfile, 400);
+
+    async function loadProfile() {
+      const user = Auth.getCurrentUser();
+      if (!user) return;
+      let profileData = {};
+      const collections = { student: 'students', faculty: 'faculty', parent: 'parents', admin: 'users' };
+      try {
+        const results = await DB.getAll(collections[role] || 'users', [DB.where('uid', '==', user.uid)]);
+        profileData = results[0] || {};
+      } catch (e) {}
+
+      const isStudent = role === 'student';
+      const content = `
+        ${Components.pageHeader('My Profile', 'Manage your account', '')}
+        <div class="grid grid-2" style="gap:24px">
+          <div class="card animate-fade-in-up">
+            <div class="flex items-center gap-4 mb-5">
+              <div class="avatar avatar-xl avatar-placeholder" style="font-size:28px" id="profileAvatar">${Utils.getInitials(profileData.name || user.displayName || user.email)}</div>
+              <div>
+                <h2 style="font-size:var(--font-size-xl);font-weight:var(--font-bold)">${Utils.escapeHtml(profileData.name || user.displayName || 'User')}</h2>
+                <p style="color:var(--text-secondary);font-size:var(--font-size-sm)">${Utils.escapeHtml(user.email)}</p>
+                <span class="badge badge-primary" style="margin-top:4px">${Utils.capitalize(role)}</span>
+              </div>
+            </div>
+            <form id="profileForm" onsubmit="updateProfile(event)">
+              <div class="grid grid-2" style="gap:12px">
+                <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="pName" value="${Utils.escapeHtml(profileData.name || user.displayName || '')}"></div>
+                <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="pEmail" value="${Utils.escapeHtml(profileData.email || user.email || '')}" readonly style="opacity:0.6"></div>
+                ${isStudent ? `
+                  <div class="form-group"><label class="form-label">Register Number</label><input type="text" class="form-input" value="${Utils.escapeHtml(profileData.registerNumber || '')}" readonly style="opacity:0.6"></div>
+                  <div class="form-group"><label class="form-label">Phone</label><input type="tel" class="form-input" id="pPhone" value="${Utils.escapeHtml(profileData.phone || '')}"></div>
+                  <div class="form-group"><label class="form-label">Year</label><input type="text" class="form-input" value="${profileData.year || ''}" readonly style="opacity:0.6"></div>
+                  <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" value="${profileData.section || ''}" readonly style="opacity:0.6"></div>
+                ` : `
+                  <div class="form-group"><label class="form-label">Phone</label><input type="tel" class="form-input" id="pPhone" value="${Utils.escapeHtml(profileData.phone || '')}"></div>
+                  <div class="form-group"><label class="form-label">Designation</label><input type="text" class="form-input" value="${profileData.designation || ''}" readonly style="opacity:0.6"></div>
+                `}
+              </div>
+              <button type="submit" class="btn btn-primary" style="margin-top:12px">Save Changes</button>
+            </form>
+          </div>
+          <div class="card animate-fade-in-up stagger-1">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Change Password</h3>
+            <form onsubmit="changePassword(event)">
+              <div class="form-group"><label class="form-label">New Password</label><input type="password" class="form-input" id="newPass" required minlength="6"></div>
+              <div class="form-group"><label class="form-label">Confirm Password</label><input type="password" class="form-input" id="confirmPass" required></div>
+              <button type="submit" class="btn btn-primary">Update Password</button>
+            </form>
+            <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
+              <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:12px">Account Info</h3>
+              <div style="font-size:var(--font-size-sm);color:var(--text-secondary)">
+                <p style="margin-bottom:8px"><strong>Role:</strong> ${Utils.capitalize(role)}</p>
+                <p style="margin-bottom:8px"><strong>Joined:</strong> ${Utils.formatDateTime(profileData.createdAt) || 'N/A'}</p>
+                <p><strong>Department:</strong> ${profileData.department || 'AI & Data Science'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    async function updateProfile(e) {
+      e.preventDefault();
+      const user = Auth.getCurrentUser();
+      if (!user) return;
+      const collections = { student: 'students', faculty: 'faculty', parent: 'parents' };
+      const col = collections[role];
+      if (!col) return;
+      try {
+        const results = await DB.getAll(col, [DB.where('uid', '==', user.uid)]);
+        if (results.length) {
+          const data = { name: document.getElementById('pName').value.trim(), phone: document.getElementById('pPhone')?.value.trim() || '' };
+          await DB.update(col, results[0].id, data);
+        }
+        await user.updateProfile({ displayName: document.getElementById('pName').value.trim() });
+        Toast.success('Updated', 'Profile updated successfully');
+        document.getElementById('sidebarUserName').textContent = document.getElementById('pName').value.trim();
+        document.getElementById('sidebarAvatar').textContent = Utils.getInitials(document.getElementById('pName').value.trim());
+      } catch (e) { Toast.error('Error', e.message); }
+    }
+
+    async function changePassword(e) {
+      e.preventDefault();
+      const newPass = document.getElementById('newPass').value;
+      const confirmPass = document.getElementById('confirmPass').value;
+      if (newPass !== confirmPass) { Toast.error('Mismatch', 'Passwords do not match'); return; }
+      try {
+        await Auth.updatePassword(newPass);
+        Toast.success('Updated', 'Password changed successfully');
+        document.getElementById('newPass').value = '';
+        document.getElementById('confirmPass').value = '';
+      } catch (e) {
+        Toast.error('Error', e.code === 'auth/requires-recent-login' ? 'Please log out and log in again before changing password.' : e.message);
+      }
+    }
+  </script>
+</body>
+</html>

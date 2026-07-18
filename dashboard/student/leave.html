@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leave Request - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let leaves = [];
+    const role = Auth.getRole() || 'student';
+    initDashboard(role, 'leave');
+    setTimeout(loadLeaves, 400);
+
+    async function loadLeaves() {
+      const user = Auth.getCurrentUser();
+      if (!user) return;
+      try {
+        if (role === 'student') {
+          leaves = await DB.getAll('leave_requests', [DB.where('studentUid', '==', user.uid), DB.orderBy('createdAt', 'desc')]);
+        } else {
+          leaves = await DB.getAll('leave_requests', [DB.orderBy('createdAt', 'desc')]);
+        }
+      } catch (e) { leaves = []; }
+      renderPage();
+    }
+
+    function renderPage() {
+      const isStudent = role === 'student';
+      const statusColors = { pending: 'badge-warning', approved: 'badge-success', rejected: 'badge-danger' };
+
+      const content = `
+        ${Components.pageHeader('Leave Requests', `${leaves.length} requests`, isStudent ? '<button class="btn btn-primary btn-sm" onclick="showApplyLeave()">+ Apply Leave</button>' : '')}
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none">
+            <table class="table">
+              <thead>
+                <tr>
+                  ${isStudent ? '' : '<th>Student</th>'}
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  ${!isStudent ? '<th>Actions</th>' : ''}
+                </tr>
+              </thead>
+              <tbody>
+                ${leaves.length ? leaves.map(l => `
+                  <tr>
+                    ${isStudent ? '' : `<td style="font-weight:var(--font-medium)">${Utils.escapeHtml(l.studentName || 'N/A')}</td>`}
+                    <td>${Utils.formatDate(l.fromDate)}</td>
+                    <td>${Utils.formatDate(l.toDate)}</td>
+                    <td style="max-width:200px">${Utils.escapeHtml(Utils.truncate(l.reason || '', 60))}</td>
+                    <td><span class="badge ${statusColors[l.status] || 'badge-primary'}">${Utils.capitalize(l.status || 'pending')}</span></td>
+                    ${!isStudent ? `
+                      <td>
+                        ${l.status === 'pending' ? `
+                          <div class="table-actions">
+                            <button class="btn btn-success btn-sm" onclick="updateLeave('${l.id}','approved')">&#10004;</button>
+                            <button class="btn btn-danger btn-sm" onclick="updateLeave('${l.id}','rejected')">&#10006;</button>
+                          </div>
+                        ` : ''}
+                      </td>
+                    ` : ''}
+                  </tr>
+                `).join('') : `<tr><td colspan="${isStudent ? 4 : 6}">${Components.emptyState('&#9998;', 'No Leave Requests', isStudent ? 'Apply for your first leave.' : 'No leave requests yet.')}</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="modal-overlay" id="leaveModal">
+          <div class="modal">
+            <div class="modal-header"><h3 class="modal-title">Apply for Leave</h3><button class="modal-close" onclick="Utils.hideModal('leaveModal')">&#10005;</button></div>
+            <div class="modal-body">
+              <form id="leaveForm" onsubmit="submitLeave(event)">
+                <div class="grid grid-2" style="gap:12px">
+                  <div class="form-group"><label class="form-label">From Date <span class="required">*</span></label><input type="date" class="form-input" id="lvFrom" required></div>
+                  <div class="form-group"><label class="form-label">To Date <span class="required">*</span></label><input type="date" class="form-input" id="lvTo" required></div>
+                </div>
+                <div class="form-group"><label class="form-label">Reason <span class="required">*</span></label><textarea class="form-input form-textarea" id="lvReason" rows="3" required placeholder="Enter reason for leave..."></textarea></div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" onclick="Utils.hideModal('leaveModal')">Cancel</button>
+              <button class="btn btn-primary" onclick="document.getElementById('leaveForm').requestSubmit()">Submit</button>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function showApplyLeave() { document.getElementById('leaveForm').reset(); Utils.showModal('leaveModal'); }
+
+    async function submitLeave(e) {
+      e.preventDefault();
+      const user = Auth.getCurrentUser();
+      if (!user) return;
+      try {
+        const students = await DB.getAll('students', [DB.where('uid', '==', user.uid)]);
+        const student = students[0] || {};
+        await DB.add('leave_requests', {
+          studentUid: user.uid,
+          studentName: student.name || user.displayName || user.email,
+          registerNumber: student.registerNumber || '',
+          fromDate: document.getElementById('lvFrom').value,
+          toDate: document.getElementById('lvTo').value,
+          reason: Utils.sanitize(document.getElementById('lvReason').value),
+          status: 'pending'
+        });
+        Toast.success('Submitted', 'Leave request submitted');
+        Utils.hideModal('leaveModal');
+        loadLeaves();
+      } catch (e) { Toast.error('Error', e.message); }
+    }
+
+    async function updateLeave(id, status) {
+      try {
+        await DB.update('leave_requests', id, { status });
+        Toast.success('Updated', `Leave ${status}`);
+        loadLeaves();
+      } catch (e) { Toast.error('Error', e.message); }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/charts.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    initDashboard('student', 'dashboard');
+
+    setTimeout(async () => {
+      let studentData = null;
+      let attendance = 88;
+      let assignments = 0, notices = 0;
+      try {
+        const user = Auth.getCurrentUser();
+        if (user) {
+          const students = await DB.getAll('students', [DB.where('uid', '==', user.uid)]);
+          studentData = students[0] || null;
+        }
+        const [assigns, n] = await Promise.all([
+          DB.getAll('assignments'),
+          DB.getAll('notifications', [DB.where('target', 'in', ['all', 'student'])])
+        ]);
+        assignments = assigns.length;
+        notices = n.length;
+      } catch (e) {}
+
+      const name = studentData?.name || Auth.getCurrentUser()?.displayName || 'Student';
+
+      const content = `
+        ${Components.pageHeader(`Welcome, ${name}!`, 'Here\'s your academic overview', '')}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#9745;', attendance + '%', 'Attendance', 'primary', 0)}
+          ${Components.statCard('&#128221;', assignments, 'Assignments', 'success', 100)}
+          ${Components.statCard('&#128196;', notices, 'New Notices', 'warning', 200)}
+          ${Components.statCard('&#128197;', '5th', 'Current Semester', 'accent', 300)}
+        </div>
+
+        <div class="grid grid-2 mb-6">
+          <div class="card animate-fade-in-up stagger-2">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Attendance Overview</h3>
+            <div style="height:260px;position:relative"><canvas id="attChart"></canvas></div>
+          </div>
+          <div class="card animate-fade-in-up stagger-3">
+            <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Today's Timetable</h3>
+            <div>
+              <div class="flex items-center gap-3 mb-3" style="padding:12px;background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                <div style="width:4px;height:40px;border-radius:2px;background:var(--primary)"></div>
+                <div>
+                  <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">Data Structures</p>
+                  <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">9:00 AM - 10:00 AM | Prof. Kumar</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 mb-3" style="padding:12px;background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                <div style="width:4px;height:40px;border-radius:2px;background:var(--success)"></div>
+                <div>
+                  <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">Machine Learning</p>
+                  <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">11:00 AM - 12:00 PM | Ms. Priya</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 mb-3" style="padding:12px;background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                <div style="width:4px;height:40px;border-radius:2px;background:var(--accent)"></div>
+                <div>
+                  <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">Database Systems</p>
+                  <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">2:00 PM - 3:00 PM | Ms. Meena</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3" style="padding:12px;background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                <div style="width:4px;height:40px;border-radius:2px;background:var(--warning)"></div>
+                <div>
+                  <p style="font-size:var(--font-size-sm);font-weight:var(--font-medium)">Python Lab</p>
+                  <p style="font-size:var(--font-size-xs);color:var(--text-secondary)">3:00 PM - 5:00 PM | Lab 2</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card animate-fade-in-up stagger-4 mb-6">
+          <h3 style="font-size:var(--font-size-base);font-weight:var(--font-semibold);margin-bottom:16px">Quick Links</h3>
+          <div class="grid grid-4" style="gap:12px">
+            <a href="/dashboard/student/attendance.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#9745;</span><span>My Attendance</span>
+            </a>
+            <a href="/dashboard/student/assignments.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#128221;</span><span>Assignments</span>
+            </a>
+            <a href="/dashboard/student/materials.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#128218;</span><span>Study Materials</span>
+            </a>
+            <a href="/dashboard/student/leave.html" class="btn btn-outline btn-full" style="flex-direction:column;gap:8px;padding:20px;height:auto">
+              <span style="font-size:24px">&#9998;</span><span>Apply Leave</span>
+            </a>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+      setTimeout(() => {
+        Charts.attendanceChart('attChart',
+          Math.round(88 * 25 / 100),
+          Math.round(8 * 25 / 100),
+          Math.round(4 * 25 / 100)
+        );
+      }, 100);
+    }, 300);
+  </script>
+</body>
+</html>

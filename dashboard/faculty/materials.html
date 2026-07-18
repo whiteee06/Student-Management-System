@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Study Materials - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let materials = [];
+    const role = Auth.getRole() || 'faculty';
+    initDashboard(role, 'materials');
+    setTimeout(loadMaterials, 400);
+
+    async function loadMaterials() {
+      try { materials = await DB.getAll('study_materials', [DB.orderBy('createdAt', 'desc')]); }
+      catch (e) { materials = []; }
+      renderPage();
+    }
+
+    function renderPage() {
+      const isAdmin = role === 'admin' || role === 'faculty';
+      const content = `
+        ${Components.pageHeader('Study Materials', `${materials.length} resources available`, isAdmin ? '<button class="btn btn-primary btn-sm" onclick="showAddMaterial()">+ Upload Material</button>' : '')}
+
+        ${materials.length ? `
+          <div class="grid grid-3" style="gap:20px">
+            ${materials.map(m => {
+              const typeIcons = { pdf: '&#128196;', notes: '&#128221;', ppt: '&#128187;', video: '&#127909;', link: '&#128279;' };
+              const typeColors = { pdf: 'rgba(239,68,68,0.1)', notes: 'rgba(37,99,235,0.1)', ppt: 'rgba(245,158,11,0.1)', video: 'rgba(139,92,246,0.1)', link: 'rgba(6,182,212,0.1)' };
+              const t = m.type || 'pdf';
+              return `
+                <div class="card animate-fade-in-up">
+                  <div class="flex items-center gap-3 mb-3">
+                    <div style="width:44px;height:44px;border-radius:var(--radius-md);background:${typeColors[t] || typeColors.pdf};display:flex;align-items:center;justify-content:center;font-size:20px">${typeIcons[t] || typeIcons.pdf}</div>
+                    <div style="flex:1">
+                      <h3 style="font-size:var(--font-size-sm);font-weight:var(--font-semibold)">${Utils.escapeHtml(m.title)}</h3>
+                      <span class="badge badge-primary" style="margin-top:2px">${Utils.escapeHtml(m.subject || 'General')}</span>
+                    </div>
+                  </div>
+                  ${m.description ? `<p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:12px">${Utils.escapeHtml(Utils.truncate(m.description, 100))}</p>` : ''}
+                  <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:8px">
+                    <span style="font-size:var(--font-size-xs);color:var(--text-tertiary)">Added ${Utils.formatDate(m.createdAt)}</span>
+                    <div class="flex gap-2">
+                      ${m.fileUrl ? `<a href="${m.fileUrl}" target="_blank" class="btn btn-primary btn-sm">&#128194; Download</a>` : ''}
+                      ${m.link ? `<a href="${m.link}" target="_blank" class="btn btn-accent btn-sm">&#128279; Link</a>` : ''}
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : Components.emptyState('&#128218;', 'No Materials', 'No study materials uploaded yet.')}
+
+        <div class="modal-overlay" id="materialModal">
+          <div class="modal">
+            <div class="modal-header">
+              <h3 class="modal-title">Upload Study Material</h3>
+              <button class="modal-close" onclick="Utils.hideModal('materialModal')">&#10005;</button>
+            </div>
+            <div class="modal-body">
+              <form id="materialForm" onsubmit="saveMaterial(event)">
+                <div class="form-group"><label class="form-label">Title <span class="required">*</span></label><input type="text" class="form-input" id="matTitle" required></div>
+                <div class="form-group"><label class="form-label">Subject</label><input type="text" class="form-input" id="matSubject"></div>
+                <div class="form-group"><label class="form-label">Type</label>
+                  <select class="form-input form-select" id="matType">
+                    <option value="pdf">PDF</option><option value="notes">Notes</option><option value="ppt">PPT</option><option value="video">Video</option><option value="link">Link</option>
+                  </select>
+                </div>
+                <div class="form-group"><label class="form-label">Description</label><textarea class="form-input form-textarea" id="matDesc" rows="2"></textarea></div>
+                <div class="form-group"><label class="form-label">File</label><input type="file" class="form-input" id="matFile" style="padding:8px"></div>
+                <div class="form-group"><label class="form-label">External Link</label><input type="url" class="form-input" id="matLink" placeholder="https://..."></div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" onclick="Utils.hideModal('materialModal')">Cancel</button>
+              <button class="btn btn-primary" onclick="document.getElementById('materialForm').requestSubmit()">Upload</button>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function showAddMaterial() { document.getElementById('materialForm').reset(); Utils.showModal('materialModal'); }
+
+    async function saveMaterial(e) {
+      e.preventDefault();
+      const title = document.getElementById('matTitle').value.trim();
+      if (!title) { Toast.warning('Required', 'Title is required'); return; }
+      try {
+        const data = {
+          title, subject: document.getElementById('matSubject').value.trim(),
+          type: document.getElementById('matType').value,
+          description: document.getElementById('matDesc').value.trim(),
+          link: document.getElementById('matLink').value.trim(),
+          fileName: ''
+        };
+        const file = document.getElementById('matFile').files[0];
+        if (file && typeof firebase !== 'undefined' && firebase.storage) {
+          const ref = firebase.storage().ref().child(`materials/${Date.now()}_${file.name}`);
+          await ref.put(file);
+          data.fileUrl = await ref.getDownloadURL();
+          data.fileName = file.name;
+        }
+        await DB.add('study_materials', data);
+        Toast.success('Uploaded', 'Material uploaded');
+        Utils.hideModal('materialModal');
+        loadMaterials();
+      } catch (e) { Toast.error('Error', e.message); }
+    }
+  </script>
+</body>
+</html>

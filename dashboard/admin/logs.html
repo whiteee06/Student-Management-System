@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Logs - AI&DS SMS</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="/assets/firebase/config.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/theme.js"></script>
+  <script src="/assets/js/auth.js"></script>
+  <script src="/assets/js/db.js"></script>
+  <script src="/assets/js/notifications.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script>
+    let allLogs = [];
+    let filteredLogs = [];
+    let currentPage = 1;
+    const perPage = 15;
+    let filterAction = '';
+    let filterDateFrom = '';
+    let filterDateTo = '';
+
+    initDashboard('admin', 'logs');
+    setTimeout(loadLogs, 400);
+
+    async function loadLogs() {
+      try { allLogs = await DB.getAll('logs', [DB.orderBy('timestamp', 'desc')]); }
+      catch (e) { allLogs = []; }
+      filteredLogs = [...allLogs];
+      renderPage();
+    }
+
+    function getActionBadge(action) {
+      const map = {
+        'create': 'badge-success', 'add': 'badge-success',
+        'update': 'badge-primary', 'edit': 'badge-primary',
+        'delete': 'badge-danger', 'remove': 'badge-danger',
+        'login': 'badge-accent', 'logout': 'badge-warning',
+        'view': 'badge-primary', 'export': 'badge-primary',
+        'import': 'badge-warning', 'error': 'badge-danger'
+      };
+      const key = (action || '').toLowerCase();
+      for (const [k, v] of Object.entries(map)) {
+        if (key.includes(k)) return v;
+      }
+      return 'badge-primary';
+    }
+
+    function getActionIcon(action) {
+      const key = (action || '').toLowerCase();
+      if (key.includes('create') || key.includes('add')) return '&#10010;';
+      if (key.includes('update') || key.includes('edit')) return '&#9998;';
+      if (key.includes('delete') || key.includes('remove')) return '&#128465;';
+      if (key.includes('login')) return '&#128274;';
+      if (key.includes('logout')) return '&#128682;';
+      if (key.includes('export')) return '&#128194;';
+      if (key.includes('error')) return '&#9888;';
+      return '&#128196;';
+    }
+
+    function applyFilters() {
+      filterAction = document.getElementById('logFilterAction')?.value || '';
+      filterDateFrom = document.getElementById('logFilterFrom')?.value || '';
+      filterDateTo = document.getElementById('logFilterTo')?.value || '';
+
+      filteredLogs = allLogs.filter(log => {
+        if (filterAction && !(log.action || '').toLowerCase().includes(filterAction.toLowerCase())) return false;
+        if (filterDateFrom) {
+          const logDate = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp || log.date);
+          if (logDate < new Date(filterDateFrom)) return false;
+        }
+        if (filterDateTo) {
+          const logDate = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp || log.date);
+          const to = new Date(filterDateTo);
+          to.setHours(23, 59, 59, 999);
+          if (logDate > to) return false;
+        }
+        return true;
+      });
+      currentPage = 1;
+      renderPage();
+    }
+
+    function renderPage() {
+      const start = (currentPage - 1) * perPage;
+      const pageData = filteredLogs.slice(start, start + perPage);
+      const actionCounts = {};
+      allLogs.forEach(l => {
+        const a = (l.action || 'other').toLowerCase();
+        actionCounts[a] = (actionCounts[a] || 0) + 1;
+      });
+      const uniqueActions = [...new Set(allLogs.map(l => l.action).filter(Boolean))];
+
+      const content = `
+        ${Components.pageHeader('Activity Logs', `${filteredLogs.length} log entries`, `
+          <button class="btn btn-outline btn-sm" onclick="exportLogs()">&#128194; Export</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="clearOldLogs()">&#128465; Clear Old Logs</button>
+        `)}
+
+        <div class="grid grid-4 mb-6">
+          ${Components.statCard('&#128196;', allLogs.length, 'Total Logs', 'primary', 0)}
+          ${Components.statCard('&#10010;', actionCounts['create'] || actionCounts['add'] || 0, 'Creations', 'success', 100)}
+          ${Components.statCard('&#9998;', actionCounts['update'] || actionCounts['edit'] || 0, 'Updates', 'accent', 200)}
+          ${Components.statCard('&#128465;', actionCounts['delete'] || actionCounts['remove'] || 0, 'Deletions', 'danger', 300)}
+        </div>
+
+        <div class="card mb-4" style="padding:16px">
+          <div class="flex items-center gap-3" style="flex-wrap:wrap">
+            <select class="form-input form-select" style="width:auto;min-width:160px" id="logFilterAction" onchange="applyFilters()">
+              <option value="">All Actions</option>
+              ${uniqueActions.map(a => `<option value="${a}">${Utils.escapeHtml(Utils.capitalize(a))}</option>`).join('')}
+            </select>
+            <div class="flex items-center gap-2">
+              <label class="form-label" style="margin:0;white-space:nowrap">From:</label>
+              <input type="date" class="form-input" style="width:auto" id="logFilterFrom" onchange="applyFilters()">
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="form-label" style="margin:0;white-space:nowrap">To:</label>
+              <input type="date" class="form-input" style="width:auto" id="logFilterTo" onchange="applyFilters()">
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="clearLogFilters()">Clear</button>
+          </div>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:40px"></th>
+                  <th>Action</th>
+                  <th>Description</th>
+                  <th>User</th>
+                  <th>Collection</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pageData.length ? pageData.map(log => {
+                  const ts = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp || log.date || Date.now());
+                  return `
+                    <tr>
+                      <td style="font-size:16px;text-align:center">${getActionIcon(log.action)}</td>
+                      <td><span class="badge ${getActionBadge(log.action)}">${Utils.escapeHtml(log.action || 'N/A')}</span></td>
+                      <td style="font-size:var(--font-size-sm);max-width:300px">${Utils.escapeHtml(Utils.truncate(log.description || log.message || 'No description', 80))}</td>
+                      <td style="font-size:var(--font-size-sm)">${Utils.escapeHtml(log.user || log.userName || 'System')}</td>
+                      <td style="font-size:var(--font-size-sm)">${Utils.escapeHtml(log.collection || log.module || '-')}</td>
+                      <td style="font-size:var(--font-size-xs);color:var(--text-secondary);white-space:nowrap">${Utils.formatDateTime(ts) || 'N/A'}</td>
+                    </tr>
+                  `;
+                }).join('') : `<tr><td colspan="6">${Components.emptyState('&#128196;', 'No Logs', 'No activity logs found.')}</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        ${Components.pagination(filteredLogs.length, perPage, currentPage, 'goToPage')}
+      `;
+      loadPageContent(content);
+    }
+
+    function clearLogFilters() {
+      filterAction = ''; filterDateFrom = ''; filterDateTo = '';
+      filteredLogs = [...allLogs];
+      currentPage = 1;
+      renderPage();
+    }
+
+    async function exportLogs() {
+      try {
+        Utils.exportToCSV(filteredLogs.map(l => {
+          const ts = l.timestamp?.toDate ? l.timestamp.toDate() : new Date(l.timestamp || l.date || Date.now());
+          return {
+            Action: l.action, Description: l.description || l.message || '',
+            User: l.user || l.userName || 'System', Collection: l.collection || l.module || '',
+            Timestamp: Utils.formatDateTime(ts)
+          };
+        }), 'activity_logs');
+        Toast.success('Exported', 'Logs exported successfully');
+      } catch (e) { Toast.error('Error', e.message); }
+    }
+
+    function clearOldLogs() {
+      confirmDelete('Delete logs older than 30 days?', async () => {
+        try {
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const oldLogs = allLogs.filter(l => {
+            const ts = l.timestamp?.toDate ? l.timestamp.toDate() : new Date(l.timestamp || l.date || 0);
+            return ts < thirtyDaysAgo;
+          });
+          for (const log of oldLogs) {
+            await DB.remove('logs', log.id);
+          }
+          Toast.success('Cleared', `${oldLogs.length} old logs removed`);
+          loadLogs();
+        } catch (e) { Toast.error('Error', e.message); }
+      });
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      renderPage();
+    }
+  </script>
+</body>
+</html>
