@@ -170,15 +170,35 @@
       let imageUrl = document.getElementById('galUrl').value.trim();
 
       if (fileInput.files[0] && !imageUrl) {
-        try {
-          const file = fileInput.files[0];
-          const path = `gallery/${Date.now()}_${file.name}`;
-          const ref = firebase.storage().ref(path);
-          await ref.put(file);
-          imageUrl = await ref.getDownloadURL();
-        } catch (err) {
-          Toast.error('Upload Error', 'Failed to upload image: ' + err.message);
+        const file = fileInput.files[0];
+        if (file.size > 5 * 1024 * 1024) {
+          Toast.error('File Too Large', 'Max file size is 5MB');
           return;
+        }
+        if (!file.type.startsWith('image/')) {
+          Toast.error('Invalid File', 'Only image files are allowed');
+          return;
+        }
+        try {
+          Toast.info('Uploading...', 'Uploading image to storage');
+          const path = `gallery/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+          const ref = firebase.storage().ref(path);
+          const snapshot = await ref.put(file, { contentType: file.type });
+          imageUrl = await snapshot.ref.getDownloadURL();
+        } catch (storageErr) {
+          console.warn('Storage upload failed, trying base64 fallback:', storageErr);
+          try {
+            imageUrl = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = () => reject(new Error('Failed to read file'));
+              reader.readAsDataURL(file);
+            });
+            Toast.info('Fallback', 'Image stored inline (Storage not configured)');
+          } catch (fallbackErr) {
+            Toast.error('Upload Error', 'Could not upload image. Paste an image URL instead.');
+            return;
+          }
         }
       }
 
@@ -196,7 +216,14 @@
         else { await DB.add('gallery', data); Toast.success('Uploaded', 'Photo added to gallery'); }
         Utils.hideModal('galleryModal');
         loadGallery();
-      } catch (err) { Toast.error('Error', err.message); }
+      } catch (err) {
+        console.error('Firestore save error:', err);
+        if (err.code === 'permission-denied') {
+          Toast.error('Save Error', 'Permission denied. Deploy your Firestore rules in Firebase Console → Firestore → Rules.');
+        } else {
+          Toast.error('Error', err.message);
+        }
+      }
     }
 
     async function deleteImage(id, title) {
