@@ -95,6 +95,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Notices collection
+    match /notices/{noticeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isFaculty();
+      allow update: if isAdmin() || isFaculty();
+      allow delete: if isAdmin();
+    }
+
     // Events collection
     match /events/{eventId} {
       allow read: if isAuthenticated();
