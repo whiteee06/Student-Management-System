@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Assignments - AI&DS SMS</title>
+  <link rel="stylesheet" href="../../assets/css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="../../assets/firebase/config.js"></script>
+  <script src="../../assets/js/utils.js"></script>
+  <script src="../../assets/js/toast.js"></script>
+  <script src="../../assets/js/theme.js"></script>
+  <script src="../../assets/js/auth.js"></script>
+  <script src="../../assets/js/db.js"></script>
+  <script src="../../assets/js/notifications.js"></script>
+  <script src="../../assets/js/components.js"></script>
+  <script src="../../assets/js/app.js"></script>
+  <script>
+    let assignments = [];
+    let currentUser = null;
+
+    initDashboard('admin', 'assignments');
+    setTimeout(loadAssignments, 400);
+
+    async function loadAssignments() {
+      currentUser = Auth.getCurrentUser();
+      try { assignments = await DB.getAll('assignments', [DB.orderBy('createdAt', 'desc')]); }
+      catch (e) { assignments = []; }
+      renderAssignments();
+    }
+
+    function renderAssignments() {
+      const content = `
+        ${Components.pageHeader('Manage Assignments', `${assignments.length} assignments`, `
+          <button class="btn btn-primary btn-sm" onclick="showAddAssignment()">+ Upload Assignment</button>
+          <button class="btn btn-outline btn-sm" onclick="exportTableToCSV('asgTable','assignments')">&#128194; Export</button>
+        `)}
+
+        <div class="card mb-4" style="padding:0;overflow:hidden">
+          <div class="table-container" style="border:none">
+            <table class="table" id="asgTable">
+              <thead>
+                <tr><th>Title</th><th>Subject</th><th>Deadline</th><th>Uploaded By</th><th>File</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                ${assignments.length ? assignments.map(a => `
+                  <tr>
+                    <td style="font-weight:var(--font-medium)">${Utils.escapeHtml(a.title)}</td>
+                    <td><span class="badge badge-primary">${Utils.escapeHtml(a.subject || 'N/A')}</span></td>
+                    <td>${Utils.formatDate(a.deadline)}</td>
+                    <td style="font-size:var(--font-size-sm);color:var(--text-secondary)">${Utils.escapeHtml(a.uploadedBy || 'N/A')}</td>
+                    <td>${a.fileName ? `<span class="badge badge-accent">${Utils.escapeHtml(a.fileName)}</span>` : 'No file'}</td>
+                    <td>
+                      <div class="table-actions">
+                        <button class="btn btn-ghost btn-sm btn-icon" data-tooltip="Delete" style="color:var(--danger)" onclick="deleteAssignment('${a.id}')">&#128465;</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('') : `<tr><td colspan="6">${Components.emptyState('&#128221;', 'No Assignments', 'No assignments uploaded yet.')}</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="modal-overlay" id="assignmentModal">
+          <div class="modal">
+            <div class="modal-header">
+              <h3 class="modal-title">Upload Assignment</h3>
+              <button class="modal-close" onclick="Utils.hideModal('assignmentModal')">&#10005;</button>
+            </div>
+            <div class="modal-body">
+              <form id="assignmentForm" onsubmit="saveAssignment(event)">
+                <div class="form-group"><label class="form-label">Title <span class="required">*</span></label><input type="text" class="form-input" id="asTitle" required placeholder="Assignment title"></div>
+                <div class="form-group"><label class="form-label">Subject</label><input type="text" class="form-input" id="asSubject" placeholder="Subject name"></div>
+                <div class="form-group"><label class="form-label">Description</label><textarea class="form-input form-textarea" id="asDesc" rows="3" placeholder="Instructions..."></textarea></div>
+                <div class="form-group"><label class="form-label">Deadline</label><input type="date" class="form-input" id="asDeadline"></div>
+                <div class="form-group"><label class="form-label">Attach File</label><input type="file" class="form-input" id="asFile" accept=".pdf,.doc,.docx,.jpg,.png" style="padding:8px"></div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" onclick="Utils.hideModal('assignmentModal')">Cancel</button>
+              <button class="btn btn-primary" onclick="document.getElementById('assignmentForm').requestSubmit()">Upload</button>
+            </div>
+          </div>
+        </div>
+      `;
+      loadPageContent(content);
+    }
+
+    function showAddAssignment() {
+      document.getElementById('assignmentForm').reset();
+      Utils.showModal('assignmentModal');
+    }
+
+    async function saveAssignment(e) {
+      e.preventDefault();
+      const title = document.getElementById('asTitle').value.trim();
+      const subject = document.getElementById('asSubject').value.trim();
+      const desc = document.getElementById('asDesc').value.trim();
+      const deadline = document.getElementById('asDeadline').value;
+      const file = document.getElementById('asFile').files[0];
+
+      if (!title) { Toast.warning('Required', 'Title is required'); return; }
+
+      try {
+        const data = { title, subject, description: desc, deadline, uploadedBy: currentUser?.displayName || currentUser?.email || 'Admin', fileName: '', fileUrl: '' };
+
+        if (file) {
+          if (file.size > 2 * 1024 * 1024) {
+            Toast.warning('File Too Large', 'Max 2MB for inline storage. Use a link for larger files.');
+            return;
+          }
+          data.fileName = file.name;
+          try {
+            if (typeof firebase !== 'undefined' && firebase.storage) {
+              const storageRef = firebase.storage().ref();
+              const fileRef = storageRef.child(`assignments/${Date.now()}_${file.name}`);
+              await fileRef.put(file);
+              data.fileUrl = await fileRef.getDownloadURL();
+            } else { throw new Error('no storage'); }
+          } catch (storageErr) {
+            const b64 = await new Promise((res, rej) => {
+              const reader = new FileReader();
+              reader.onload = () => res(reader.result);
+              reader.onerror = rej;
+              reader.readAsDataURL(file);
+            });
+            data.fileUrl = b64;
+          }
+        }
+
+        await DB.add('assignments', data);
+        Toast.success('Uploaded', 'Assignment uploaded successfully');
+        Utils.hideModal('assignmentModal');
+        loadAssignments();
+      } catch (e) {
+        Toast.error('Error', e.message);
+      }
+    }
+
+    async function deleteAssignment(id) {
+      confirmDelete('Delete this assignment?', async () => {
+        try { await DB.remove('assignments', id); Toast.success('Deleted', 'Assignment removed'); loadAssignments(); }
+        catch (e) { Toast.error('Error', e.message); }
+      });
+    }
+  </script>
+</body>
+</html>
